@@ -1,0 +1,27 @@
+// @use './styles/colors.scss' as col;
+// @use './styles/fonts.scss' as font;
+
+// @import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@700&display=swap');
+
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  // font-family: font.$all, 'sans-serif';
+  // color: col.$text;
+}
+
+body {
+  min-height: 100vh;
+  min-width: 100vw;
+}
+
+:root {
+  height: 100%;
+  width: 100%;
+}
