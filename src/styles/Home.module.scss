@@ -1,0 +1,22 @@
+@use './colors.scss' as col;
+
+
+.container {
+   min-width: 100vw;
+   min-height: 100vh;
+
+   padding: 2vh 5vw 2vh 5vw;
+}
+
+.main { flex: 1; }
+
+.info {
+   flex: 1;
+
+   text-align: center;
+}
+
+.actions {
+   width: 100%;
+   min-height: 30vh;
+}
