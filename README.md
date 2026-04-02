@@ -1,27 +1,42 @@
-# Imposter PWA
+# sv
 
-**Progressive Web App implementation of the classic "Imposter" multiplayer game** – my final project for Web Development class. Fully offline-capable, installable, and responsive.
+Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
 
-![PWA Badge](https://img.shields.io/badge/PWA-Ready-brightgreen) ![React](https://img.shields.io/badge/React-18-blue) ![Vite](https://img.shields.io/badge/Vite-5-orange) ![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blueviolet)
+## Creating a project
 
-## 🎮 Features (Planned)
+If you're seeing this, you've probably already done this step. Congrats!
 
-- **Multiplayer Imposter gameplay** (dedicated servers or P2P).
-- **Offline mode**: Solo practice, cached assets via Service Worker.
-- **Installable**: Add to home screen (manifest + icons).
-- **Responsive**: Mobile-first design (desktop too).
-- **Push notifications**: Game invites/updates.
-- **Auto-updates**: Seamless SW updates.
-- **Performance**: Lighthouse PWA score 100% target.
+```sh
+# create a new project
+npx sv create my-app
+```
 
-## 🛠 Tech Stack
+To recreate this project with the same configuration:
 
-| Frontend | Build | PWA | Tools |
-|----------|-------|-----|-------|
-| React 18 + TS | Vite 5 | `vite-plugin-pwa` (generateSW) | ESLint, TailwindCSS (future) |
+```sh
+# recreate this project
+npx sv@0.13.0 create --template minimal --types ts --install npm .
+```
 
-## 🚀 Quick Start
+## Developing
 
-```bash
-# Clone & install
-git clone <your-repo> imposter-pwa
+Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+
+```sh
+npm run dev
+
+# or start the server and open the app in a new browser tab
+npm run dev -- --open
+```
+
+## Building
+
+To create a production version of your app:
+
+```sh
+npm run build
+```
+
+You can preview the production build with `npm run preview`.
+
+> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.

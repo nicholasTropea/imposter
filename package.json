@@ -1,40 +1,30 @@
 {
-  "name": "imposter",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "antd": "^6.3.1",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "react-router": "^7.13.0",
-    "react-router-dom": "^7.13.0"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.37.0",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "@vite-pwa/assets-generator": "^1.0.2",
-    "@vitejs/plugin-react": "^5.0.4",
-    "eslint": "^9.37.0",
-    "eslint-plugin-react-hooks": "^5.2.0",
-    "eslint-plugin-react-refresh": "^0.4.23",
-    "globals": "^16.4.0",
-    "sass": "^1.97.3",
-    "typescript": "^5.9.3",
-    "vite": "^7.1.9",
-    "vite-plugin-pwa": "^1.1.0",
-    "workbox-core": "^7.3.0",
-    "workbox-window": "^7.4.0"
-  },
-  "overrides": {
-    "sharp": "^0.33.5",
-    "sharp-ico": "^0.1.5"
-  }
+	"name": "imposter",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"prepare": "svelte-kit sync || echo ''",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
+	},
+	"devDependencies": {
+		"@fontsource-variable/google-sans-flex": "^5.2.1",
+		"@iconify/json": "^2.2.458",
+		"@ktibow/iconset-material-symbols": "^0.0.1764827375",
+		"@sveltejs/adapter-auto": "^7.0.0",
+		"@sveltejs/kit": "^2.50.2",
+		"@sveltejs/vite-plugin-svelte": "^6.2.4",
+		"m3-svelte": "^7.1.2",
+		"svelte": "^5.54.0",
+		"svelte-check": "^4.4.2",
+		"typescript": "^5.9.3",
+		"unplugin-icons": "^23.0.1",
+		"vite": "^7.3.1",
+		"vite-plugin-functions-mixins": "^0.4.1"
+	},
+	"dependencies": {}
 }
