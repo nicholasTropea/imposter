@@ -9,7 +9,6 @@ export default defineConfig({
 		sveltekit(),
 		Icons({
 			compiler: 'svelte'
-		}),
-		functionsMixins({ deps: ["m3-svelte"] })
+		})
 	]
 });
