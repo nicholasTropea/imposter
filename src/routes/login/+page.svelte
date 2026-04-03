@@ -9,9 +9,11 @@
 <div class = 'wrapper'>
     <h1>LOGIN</h1>
 
-    <TextFieldOutlined label = 'email' />
-    <TextFieldOutlined label = 'password' />
-    <Button variant='filled'> LOGIN </Button>
+    <form method = 'POST' action = '?/login'>
+        <TextFieldOutlined label = 'email' name='email'/>
+        <TextFieldOutlined label = 'password' name='password'/>
+        <Button variant='filled' type='submit'> LOGIN </Button>
+    </form>
 
     <div class = 'toLogin'>
         <span>Don't have an account ?</span>
@@ -19,6 +21,7 @@
     </div>
     
 </div>
+
 
 <style>
     .wrapper {
