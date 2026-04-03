@@ -12,12 +12,16 @@
         { label: 'CHECK', icon: CheckIcon },
         { label: 'PROFILE', icon: UserIcon }
     ];
+
+    const { data } = $props(); // From (protected) layout file
 </script>
 
 
 <!-- HTML -->
 <div class = 'wrapper'>
     <main>
+        <span>User: {data.nickname}</span>
+
         <Button variant='filled'> Play Ranked Game </Button>
 
         <div class = 'auxButtons'>
