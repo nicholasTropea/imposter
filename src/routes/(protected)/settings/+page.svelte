@@ -4,9 +4,16 @@
     import SettingsSwitch from '$components/ui/SettingsSwitch.svelte';
     import { Card, ConnectedButtons, Button } from 'm3-svelte';
 
+    import NavBar from '$components/ui/NavBar.svelte';
+
+    import HomeIcon from '~icons/mdi/home';
+    import CheckIcon from '~icons/mdi/check-circle';
+    import SettingsIcon from '~icons/mdi/gear';
+
     import { untrack } from 'svelte';
     import { browser } from '$app/environment';
     import { themeStore } from '$lib/stores/theme.svelte.js';
+    import { goto } from '$app/navigation';
 
     // ── Props ──────────────────────────────────────────────────────────────────────────
     const { data } = $props(); // From (protected) layout file
@@ -30,20 +37,20 @@
     // ── Autosave ───────────────────────────────────────────────────────────────────────
     let saveTimeout: ReturnType<typeof setTimeout>;
 
+    /**
+     * Schedules a debounced POST to the `saveSettings` action.
+     *
+     * Resets the timer on every call, so the request is only sent 800ms after
+     * the *last* change — preventing redundant DB writes while the user is
+     * actively dragging a slider or toggling multiple switches in quick succession.
+     *
+     * Builds the request body manually as `application/x-www-form-urlencoded`
+     * to match what SvelteKit's `request.formData()` expects server-side,
+     * without needing an actual `<form>` element in the DOM.
+     */
     function scheduleAutoSave() {
         clearTimeout(saveTimeout);
 
-        /**
-         * Schedules a debounced POST to the `saveSettings` action.
-         *
-         * Resets the timer on every call, so the request is only sent 800ms after
-         * the *last* change — preventing redundant DB writes while the user is
-         * actively dragging a slider or toggling multiple switches in quick succession.
-         *
-         * Builds the request body manually as `application/x-www-form-urlencoded`
-         * to match what SvelteKit's `request.formData()` expects server-side,
-         * without needing an actual `<form>` element in the DOM.
-         */
         saveTimeout = setTimeout(async () => {
             await fetch('?/saveSettings', {
                 method: 'POST',
@@ -77,47 +84,59 @@
 
         if (browser) scheduleAutoSave();
     });
+
+    // ── Navbar ─────────────────────────────────────────────────────────────────────────    
+    const navItems = [
+        { label: 'HOME', icon: HomeIcon, handleClick: (() => goto('/home')) },
+        { label: 'CHECK', icon: CheckIcon },
+        { label: 'SETTINGS', icon: SettingsIcon, active: true }
+    ];
 </script>
 
 
 <!-- HTML -->
 <div class = 'wrapper'>
-    <Card variant = 'filled'>
-        <SettingsSlider label = 'Master Volume' bind:initial = {masterVolume} />
-        <SettingsSlider label = 'Music Volume' bind:initial = {musicVolume} />
-        <SettingsSwitch label = 'Sound Effects' bind:active = {soundEffects}/>
-    </Card>
+    <div class = 'settingsWrapper'>
+        <Card variant = 'filled'>
+            <SettingsSlider label = 'Master Volume' bind:initial = {masterVolume} />
+            <SettingsSlider label = 'Music Volume' bind:initial = {musicVolume} />
+            <SettingsSwitch label = 'Sound Effects' bind:active = {soundEffects}/>
+        </Card>
 
-    <Card variant = 'filled'>
-        <SettingsSwitch
-            label = 'Game Invites'
-            meaning = 'When friends want you to play'
-            bind:active = {gameInvites}
-        />
+        <Card variant = 'filled'>
+            <SettingsSwitch
+                label = 'Game Invites'
+                meaning = 'When friends want you to play'
+                bind:active = {gameInvites}
+            />
 
-        <SettingsSwitch
-            label = 'Daily Rewards'
-            meaning = 'Reminders for free coins'
-            bind:active = {dailyRewards}
-        />
-    </Card>
+            <SettingsSwitch
+                label = 'Daily Rewards'
+                meaning = 'Reminders for free coins'
+                bind:active = {dailyRewards}
+            />
+        </Card>
 
-    <ConnectedButtons >
-        <Button
-            onclick={() => setTheme('dark')}
-            variant = {theme === 'dark' ? 'filled' : 'outlined'}
-        > 
-            Dark
-        </Button>
+        <ConnectedButtons >
+            <Button
+                onclick={() => setTheme('dark')}
+                variant = {theme === 'dark' ? 'filled' : 'outlined'}
+            > 
+                Dark
+            </Button>
 
-        <Button
-            onclick={() => setTheme('light')}
-            variant = {theme === 'light' ? 'filled' : 'outlined'}
-        >
-            Light
-        </Button>
-    </ConnectedButtons>
+            <Button
+                onclick={() => setTheme('light')}
+                variant = {theme === 'light' ? 'filled' : 'outlined'}
+            >
+                Light
+            </Button>
+        </ConnectedButtons>
+    </div>
+
+    <NavBar items = {navItems} />
 </div>
+
 
 
 <style>
@@ -126,6 +145,16 @@
         height: 100%;
 
         display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .settingsWrapper {
+        width: 100%;
+
+        display: flex;
+        flex: 1;
         flex-direction: column;
         justify-content: space-around;
         align-items: center;

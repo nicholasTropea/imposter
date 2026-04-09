@@ -1,19 +1,28 @@
 <script lang='ts'>
+    // ── Imports ────────────────────────────────────────────────────────────────────────
     import NavBar from '$components/ui/NavBar.svelte';
 
     import HomeIcon from '~icons/mdi/home';
     import CheckIcon from '~icons/mdi/check-circle';
-    import UserIcon from '~icons/mdi/account';
+    import SettingsIcon from '~icons/mdi/gear';
 
     import { Button } from 'm3-svelte';
+    import { goto } from '$app/navigation';
 
-    const navItems = [
-        { label: 'HOME', icon: HomeIcon },
-        { label: 'CHECK', icon: CheckIcon },
-        { label: 'PROFILE', icon: UserIcon }
-    ];
-
+    // ── Props ──────────────────────────────────────────────────────────────────────────
     const { data } = $props(); // From (protected) layout file
+
+    // ── Navbar ─────────────────────────────────────────────────────────────────────────    
+    const navItems = [
+        { label: 'HOME', icon: HomeIcon, active: true },
+        { label: 'CHECK', icon: CheckIcon },
+        { label: 'SETTINGS', icon: SettingsIcon, handleClick: (() => goto('/settings')) }
+    ]; 
+
+    // ── Navigation ─────────────────────────────────────────────────────────────────────
+    function handleRankedClick(): void {
+        goto('/loading_lobby');
+    }
 </script>
 
 
@@ -22,7 +31,9 @@
     <main>
         <span>User: {data.nickname}</span>
 
-        <Button variant='filled'> Play Ranked Game </Button>
+        <Button variant = 'filled' onclick = {handleRankedClick} >
+            Play Ranked Game
+        </Button>
 
         <div class = 'auxButtons'>
             <Button> Create Game </Button>
@@ -55,8 +66,6 @@
         gap: 10vh;
     }
 
-    .ranked { color: yellow; }
-
     .auxButtons {
         width: 100%;
 
@@ -64,9 +73,5 @@
         flex-direction: row;
         justify-content: space-around;
         align-items: center;
-    }
-
-    .nav {
-        width: 100%;
     }
 </style>
