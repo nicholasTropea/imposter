@@ -1,7 +1,7 @@
 <script lang='ts'>
     // ── Imports ────────────────────────────────────────────────────────────────────────    
     import { goto } from '$app/navigation';
-    import { onMount } from 'svelte';
+    import { onMount, untrack } from 'svelte';
     import { createBrowserClient } from '@supabase/ssr';
     import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
 
@@ -16,9 +16,10 @@
 
     /**
      * Reactive list of players currently in the lobby.
-     * Seeded from the server-rendered `data.players` and kept in sync via Realtime.
+     * Seeded once from server-rendered `data.players` and kept in sync via Realtime.
+     * `untrack` prevents `data` from being tracked as a reactive dependency.
      */
-    let players = $state<Player[]>(data.players ?? []);
+    let players = $state<Player[]>(untrack(() => data.players ?? []));
 
     /**
      * Browser-side Supabase client used exclusively for Realtime subscriptions
