@@ -1,6 +1,8 @@
-import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public'
-import { createServerClient } from '@supabase/ssr'
-import type { Handle } from '@sveltejs/kit'
+import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
+import { createServerClient } from '@supabase/ssr';
+
+import type { Handle } from '@sveltejs/kit';
+import type { Database } from '$lib/types/supabase';
 
 /**
  * SvelteKit server hook that runs on every request.
@@ -36,7 +38,7 @@ export const handle: Handle = async ({ event, resolve }) => {
      * Should only be used server-side (load functions, actions, hooks).
      * For client-side usage, use the browser Supabase client instead.
      */
-    event.locals.supabase = createServerClient(
+    event.locals.supabase = createServerClient<Database>(
         PUBLIC_SUPABASE_URL,
         PUBLIC_SUPABASE_ANON_KEY,
         {
@@ -80,4 +82,4 @@ export const handle: Handle = async ({ event, resolve }) => {
         filterSerializedResponseHeaders: (name) =>
             name === 'content-range' || name === 'x-supabase-api-version'
     });
-}
+};
