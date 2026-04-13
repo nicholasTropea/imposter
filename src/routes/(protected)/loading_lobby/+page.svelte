@@ -1,8 +1,3 @@
-<script lang='ts'>
-
-</script>
-
-
 <!-- HTML -->
 <div class = 'wrapper'>
     <span>Finding the right game...</span>

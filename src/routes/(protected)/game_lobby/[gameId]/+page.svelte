@@ -1,0 +1,130 @@
+<script lang='ts'>
+    // ── Imports ────────────────────────────────────────────────────────────────────────    
+    import { goto } from '$app/navigation';
+    import { onMount } from 'svelte';
+    import { createBrowserClient } from '@supabase/ssr';
+    import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
+
+    import type { Database } from '$lib/types/supabase.js';
+    import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+
+    // ── Types ──────────────────────────────────────────────────────────────────────────
+    type Player = { user_id: string; nickname: string; };
+
+    // ── Props ──────────────────────────────────────────────────────────────────────────
+    const { data } = $props();
+
+    /**
+     * Reactive list of players currently in the lobby.
+     * Seeded from the server-rendered `data.players` and kept in sync via Realtime.
+     */
+    let players = $state<Player[]>(data.players ?? []);
+
+    /**
+     * Browser-side Supabase client used exclusively for Realtime subscriptions
+     * and refetch queries on the client. Auth is handled server-side via `locals.supabase`.
+     */
+    const supabase = createBrowserClient<Database>(
+        PUBLIC_SUPABASE_URL,
+        PUBLIC_SUPABASE_ANON_KEY
+    );
+
+    onMount(() => {
+        /**
+         * Realtime channel scoped to this specific game lobby.
+         * Listens for two event streams:
+         * 1. Any change on `ranked_game_players` filtered by `game_id`:
+         *           refetches player list.
+         * 2. UPDATE on `ranked_games` filtered by `id` →:
+         *           navigates to game when status becomes `in_progress`.
+         */
+        const channel = supabase
+            .channel(`game_lobby:${data.gameId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',  // INSERT (player joins) or DELETE (player leaves)
+                    schema: 'public',
+                    table: 'ranked_game_players',
+                    filter: `game_id=eq.${data.gameId}`
+                },
+                () => {
+                    /**
+                     * Refetch the full player list instead of patching from the payload,
+                     * because the payload only contains `ranked_game_players` columns —
+                     * not the joined `nickname` from the `players` table.
+                     */
+                    supabase
+                        .from('ranked_game_players')
+                        .select('user_id, players!inner(id, nickname)')
+                        .eq('game_id', data.gameId)
+                        .overrideTypes<Array<{
+                            user_id: string;
+                            players: { id: string; nickname: string };
+                        }>>()
+                        .then(({ data: updated }) => {
+                            if (updated) {
+                                players = updated.map(row => ({
+                                    user_id: row.user_id,
+                                    nickname: row.players.nickname
+                                }));
+                            }
+                        });
+                }
+            )
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'ranked_games',
+                    filter: `id=eq.${data.gameId}`
+                },
+                (payload: RealtimePostgresChangesPayload<{ status: string }>) => {
+                    /**
+                     * Navigates all players in the lobby to the game page
+                     * when the host starts the game and `status` transitions
+                     * to `in_progress`.
+                     */
+                    if (
+                        typeof payload.new === 'object' &&
+                        payload.new !== null &&
+                        'status' in payload.new &&
+                        payload.new.status === 'in_progress'
+                    ) {
+                        goto(`/game/${data.gameId}`);
+                    }
+                }
+            )
+            .subscribe();
+        
+        /** Unsubscribe and clean up the channel when the component is destroyed. */
+        return () => supabase.removeChannel(channel);
+    });
+</script>
+
+
+<!-- HTML -->
+<div class='wrapper'>
+    <span>Game: {data.gameId}</span>
+
+    <ul>
+        {#each players as player}
+            <li>{player.nickname}</li>
+        {/each}
+    </ul>
+</div>
+
+
+<style>
+    .wrapper {
+        width: 100%;
+        height: 100%;
+
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+    }
+</style>
