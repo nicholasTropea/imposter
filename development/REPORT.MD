@@ -34,12 +34,12 @@ The active theme is applied by a Svelte `$effect` rune in `routes/+layout.svelte
 
 When a user initiates a ranked game search, they are redirected to a loading screen while matchmaking runs server-side. The lookup follows this logic:
 
-1. Query the `ranked_games` table for any game with `status = 'waiting'`, ordered by creation time ascending (oldest first, as it is most likely to fill up soonest).
+1. Query the `ranked_games` table for any game with `status = 'waiting'`, ordered by most populated first (to fill games as quickly as possible).
 2. If a waiting game is found, the user is atomically added to it via the `ranked_game_players` table.
-3. If no waiting game exists, a new one is created and the user is added as its first player.
+3. If no waiting game exists, a new one is created with a randomly selected word pair from the `words` table, and the user is added as its first player.
 4. The user is redirected to the game lobby page for the found or created game.
 
-Steps 1–3 are executed inside a single PostgreSQL function using `FOR UPDATE SKIP LOCKED` to prevent race conditions: if two users trigger the lookup simultaneously, one acquires the row lock and joins the existing game, while the other skips the locked row and creates a new one, ensuring no two players are accidentally placed in the same game slot twice.
+Steps 1–3 are executed inside a single PostgreSQL function (`join_or_create_ranked_game`) using `pg_advisory_xact_lock` to prevent race conditions: if two users trigger the lookup simultaneously, one acquires the application-level lock and proceeds, while the other waits until the first transaction commits, ensuring no two players are accidentally placed in different games when one slot was available.
 
 > **Note:** Elo-based matchmaking (pairing players of similar skill rating) is not implemented at this stage. Given the current low player count, all ranked players are pooled together regardless of Elo. Skill-based filtering will be introduced once the player base is large enough to support it without excessively increasing queue wait times.
 
@@ -53,3 +53,13 @@ Once redirected to the lobby, players wait for the game to fill up. The lobby pa
 The lobby also subscribes to `UPDATE` events on the `ranked_games` table. When the game's `status` transitions to `in_progress`, all connected clients are automatically navigated to the game page via `goto()`.
 
 Both Realtime subscriptions require the `ranked_game_players` and `ranked_games` tables to be included in the `supabase_realtime` PostgreSQL publication. The channel is cleaned up via `onMount`'s return callback when the component is destroyed.
+
+## Game Start & Role Assignment
+
+When the last player joins and the lobby reaches `max_players`, the `join_or_create_ranked_game` function handles game initialization atomically in the same transaction as the player insertion:
+
+1. `ranked_games.status` is set to `in_progress`.
+2. All players in the game are randomly shuffled using `ROW_NUMBER() OVER (ORDER BY random())` and assigned roles: the 1st player becomes the **spy**, the 2nd and 3rd become **imposters**, and the rest are **civilians**.
+3. Each player's resolved word is written to their `ranked_game_players.word` column based on their role — civilians receive the civilian word, imposters receive the imposter word, and the spy receives `NULL`.
+
+Because all three steps occur within the same transaction, the Realtime notification that triggers client navigation to `/game` is only fired after the commit — guaranteeing that roles and words are always set by the time any client fetches them. Players receive only their own word via RLS policies on `ranked_game_players`, preventing any client from reading another player's assigned word.
