@@ -4,6 +4,7 @@
     import { onMount, untrack } from 'svelte';
     import { createBrowserClient } from '@supabase/ssr';
     import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
+    import { startHeartbeat } from '$lib/utils/heartbeat';
 
     import type { Database } from '$lib/types/supabase.js';
     import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
@@ -31,6 +32,9 @@
     );
 
     onMount(() => {
+        // Start the heartbeat
+        const stopHeartbeat = startHeartbeat(data.gameId);
+
         // Guard: if the game already started before the subscription was ready
         // Used since the last player wasnt getting redirected because of the
         // race-condition between client and database
@@ -42,7 +46,6 @@
             .then(({ data: game }) => {
                 if (game?.status === 'in_progress') {
                     goto(`/game/${data.gameId}`);
-                    return;
                 }
         });
         
@@ -116,7 +119,10 @@
             .subscribe();
         
         /** Unsubscribe and clean up the channel when the component is destroyed. */
-        return () => supabase.removeChannel(channel);
+        return () => {
+            supabase.removeChannel(channel);
+            stopHeartbeat();
+        };
     });
 </script>
 
