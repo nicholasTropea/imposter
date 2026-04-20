@@ -31,6 +31,22 @@
     );
 
     onMount(() => {
+        // Guard: if the game already started before the subscription was ready
+        // Used since the last player wasnt getting redirected because of the
+        // race-condition between client and database
+        supabase
+            .from('ranked_games')
+            .select('status')
+            .eq('id', data.gameId)
+            .single()
+            .then(({ data: game }) => {
+                if (game?.status === 'in_progress') {
+                    goto(`/game/${data.gameId}`);
+                    return;
+                }
+        });
+        
+        
         /**
          * Realtime channel scoped to this specific game lobby.
          * Listens for two event streams:

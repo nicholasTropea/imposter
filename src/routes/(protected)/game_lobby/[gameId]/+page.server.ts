@@ -4,6 +4,34 @@ import type { PageServerLoad } from './$types';
 
 type Player = { user_id: string; nickname: string };
 
+
+/**
+ * Fetches all players in a game with their nicknames.
+ *
+ * @param gameId - The UUID of the ranked game.
+ * @param locals - SvelteKit locals containing the Supabase client.
+ * @returns Array of players with their user IDs and nicknames.
+ * @throws If the database query fails.
+ */
+async function getNicknames(gameId: string, locals: App.Locals): Promise<Player[]> {
+    const { data, error } = await locals.supabase
+            .from('ranked_game_players')
+            .select('user_id, players!inner(id, nickname)')
+            .eq('game_id', gameId)
+            .overrideTypes<Array<{ // Used because TS couldnt infer the correct type
+                    user_id: string;
+                    players: { id: string; nickname: string };
+            }>>();
+
+    if (error) throw error;
+
+    return data.map(row => ({
+        user_id: row.user_id,
+        nickname: row.players.nickname
+    }))
+}
+
+
 /**
  * Load function for the ranked game lobby page.
  *
@@ -22,22 +50,7 @@ export const load: PageServerLoad = async ({ params, locals, parent }) => {
     
     const { gameId } = params;  // UUID from the URL
 
-    // Define the query shape so QueryData can infer the correct types
-    const { data, error } = await locals.supabase
-            .from('ranked_game_players')
-            .select('user_id, players!inner(id, nickname)')
-            .eq('game_id', gameId)
-            .overrideTypes<Array<{ // Used because TS couldnt infer the correct type
-                    user_id: string;
-                    players: { id: string; nickname: string };
-            }>>();
-
-    if (error) throw error;
-
-    const players: Player[] = data.map(row => ({
-        user_id: row.user_id,
-        nickname: row.players.nickname
-    }))
+    const players = await getNicknames(gameId, locals);
 
     return { gameId, players };
 }
