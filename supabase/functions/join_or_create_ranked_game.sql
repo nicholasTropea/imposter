@@ -1,10 +1,25 @@
 -- Creates (or replaces) a function that either joins an existing ranked game
--- or creates a new one if none is available. Returns the game's UUID.
+-- or creates a new one if none is available.
+--
+-- Acquires an advisory lock during execution to prevent race conditions
+-- when multiple players try to join simultaneously.
+--
+-- If the game reaches max_players after this player joins, the game is
+-- transitioned to 'in_progress' and the following setup is performed:
+--   - Players are assigned roles randomly (1 spy, 2 imposters, rest civilians)
+--   - Each player receives their secret word based on their role (spy gets NULL)
+--   - A random turn order is generated and stored
+--   - The first player in the turn order is set as the active player
+--   - The game phase is set to 'word_input'
+--
+-- Returns the UUID of the game the player joined or created.
 create or replace function join_or_create_ranked_game (p_user_id UUID) RETURNS UUID as $$
 
 -- DECLARE is where you define local variables
 DECLARE
-    result_game_id UUID;  -- will hold the UUID of the game we find or create
+    v_result_game_id UUID;  -- will hold the UUID of the game we find or create
+    v_turn_order     UUID[];
+    v_status         text;
 
 -- BEGIN/END wraps the actual logic of the function
 BEGIN
@@ -18,7 +33,7 @@ BEGIN
     -- SELECT INTO stores the query result into a variable.
     -- Finds the most populated game that still has room (player_count < max).
     -- If no rows match, game_id stays NULL.
-    SELECT id INTO result_game_id
+    SELECT id INTO v_result_game_id
     FROM ranked_games
     WHERE status = 'waiting'
       AND player_count < max_players
@@ -27,19 +42,19 @@ BEGIN
 
     
     -- No available game found — create a new one and immediately assign a random word pair.
-    -- RETURNING lets you capture the generated UUID immediately
+    -- RETURNING captures the generated UUID immediately
     -- instead of doing a separate SELECT after the INSERT.
-    IF result_game_id IS NULL THEN
+    IF v_result_game_id IS NULL THEN
         INSERT INTO ranked_games (words_id)
         VALUES ((SELECT id FROM words ORDER BY random() LIMIT 1))
-        RETURNING id INTO result_game_id;        
+        RETURNING id INTO v_result_game_id;        
     END IF;
 
     -- Add the player to the game.
     -- ON CONFLICT DO NOTHING prevents an error if they somehow call this twice
     -- (the PRIMARY KEY on ranked_game_players is (game_id, user_id)).
     INSERT INTO ranked_game_players (game_id, user_id)
-    VALUES (result_game_id, p_user_id)
+    VALUES (v_result_game_id, p_user_id)
     ON CONFLICT DO NOTHING;
 
     -- Increment the player count and set the status to 'in-progress' if the game is full.
@@ -50,16 +65,17 @@ BEGIN
             WHEN player_count + 1 >= max_players THEN 'in_progress' -- Checks old player count
             ELSE 'waiting'
         END
-    WHERE id = result_game_id;
+    WHERE id = v_result_game_id
+    RETURNING status INTO v_status;
 
 
     -- Randomly shuffle all players in the game, then assign roles and words:
-    -- 1st player  → spy
-    -- 2nd player  → imposter
-    -- 3rd player  → imposter
-    -- rest        → civilian
+    -- 1st player  -> spy
+    -- 2nd player  -> imposter
+    -- 3rd player  -> imposter
+    -- rest        -> civilian
     -- ROW_NUMBER() OVER (ORDER BY random()) gives each player a random rank
-    IF (SELECT status FROM ranked_games WHERE id = result_game_id) = 'in_progress' THEN
+    IF v_status = 'in_progress' THEN
         -- Assign roles based on random shuffle
         UPDATE ranked_game_players
         SET role = CASE ranked.row_num
@@ -72,10 +88,10 @@ BEGIN
             SELECT user_id,
                    ROW_NUMBER() OVER (ORDER BY random()) AS row_num
             FROM ranked_game_players
-            WHERE ranked_game_players.game_id = result_game_id
+            WHERE ranked_game_players.game_id = v_result_game_id
         ) AS ranked
         WHERE ranked_game_players.user_id = ranked.user_id
-          AND ranked_game_players.game_id = result_game_id;
+          AND ranked_game_players.game_id = v_result_game_id;
 
         
         -- Assign words based on role
@@ -87,12 +103,29 @@ BEGIN
         END
         FROM ranked_games
         JOIN words ON words.id = ranked_games.words_id
-        WHERE ranked_game_players.game_id = result_game_id
-        AND ranked_games.id = result_game_id;
+        WHERE ranked_game_players.game_id = v_result_game_id
+        AND ranked_games.id = v_result_game_id;
+
+        -- Build a random turn order from all players in the game
+        SELECT ARRAY(
+            SELECT id
+            FROM ranked_game_players
+            WHERE game_id = v_result_game_id
+            ORDER BY random()
+        ) INTO v_turn_order;
+
+        -- Store turn order, set first active player, set phase to word_input
+        UPDATE ranked_games SET
+            turn_order       = v_turn_order,
+            turn_index       = 0,
+            active_player_id = v_turn_order[1], -- 1-based in Postgres
+            phase            = 'word_input',
+            phase_deadline   = now() + interval '15 seconds' -- first turn starts immediately
+        WHERE id = v_result_game_id;
     END IF;
 
     -- Returns the game UUID to the caller (the SvelteKit .rpc() call)
-    RETURN result_game_id;
+    RETURN v_result_game_id;
 END;
 
 -- Double dollar sign marks the end of the function body. LANGUAGE plpgsql tells Postgres
