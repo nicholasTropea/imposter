@@ -2,11 +2,9 @@
     // ── Imports ────────────────────────────────────────────────────────────────────────    
     import { goto } from '$app/navigation';
     import { onMount, untrack } from 'svelte';
-    import { createBrowserClient } from '@supabase/ssr';
-    import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
     import { startHeartbeat } from '$lib/utils/heartbeat';
+    import { supabase } from '$lib/supabase';
 
-    import type { Database } from '$lib/types/supabase.js';
     import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
     // ── Types ──────────────────────────────────────────────────────────────────────────
@@ -21,15 +19,6 @@
      * `untrack` prevents `data` from being tracked as a reactive dependency.
      */
     let players = $state<Player[]>(untrack(() => data.players ?? []));
-
-    /**
-     * Browser-side Supabase client used exclusively for Realtime subscriptions
-     * and refetch queries on the client. Auth is handled server-side via `locals.supabase`.
-     */
-    const supabase = createBrowserClient<Database>(
-        PUBLIC_SUPABASE_URL,
-        PUBLIC_SUPABASE_ANON_KEY
-    );
 
     onMount(() => {
         // Start the heartbeat
@@ -78,10 +67,6 @@
                         .from('ranked_game_players')
                         .select('user_id, players!inner(id, nickname)')
                         .eq('game_id', data.gameId)
-                        .overrideTypes<Array<{
-                            user_id: string;
-                            players: { id: string; nickname: string };
-                        }>>()
                         .then(({ data: updated }) => {
                             if (updated) {
                                 players = updated.map(row => ({

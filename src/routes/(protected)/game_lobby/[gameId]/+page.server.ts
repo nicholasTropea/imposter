@@ -17,11 +17,7 @@ async function getNicknames(gameId: string, locals: App.Locals): Promise<Player[
     const { data, error } = await locals.supabase
             .from('ranked_game_players')
             .select('user_id, players!inner(id, nickname)')
-            .eq('game_id', gameId)
-            .overrideTypes<Array<{ // Used because TS couldnt infer the correct type
-                    user_id: string;
-                    players: { id: string; nickname: string };
-            }>>();
+            .eq('game_id', gameId);
 
     if (error) throw error;
 
@@ -45,8 +41,8 @@ async function getNicknames(gameId: string, locals: App.Locals): Promise<Player[
  *          player currently in the game.
  */
 export const load: PageServerLoad = async ({ params, locals, parent }) => {
-    const { user } = await parent();
-    if (!user) redirect(303, '/login');
+    const { userId } = await parent();
+    if (!userId) redirect(303, '/login');
     
     const { gameId } = params;  // UUID from the URL
 

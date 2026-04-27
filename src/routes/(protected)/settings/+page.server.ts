@@ -16,17 +16,17 @@ import type { Actions } from '@sveltejs/kit';
  *
  * @throws {redirect} 303 to `/login` if the session is invalid or expired.
  */
-export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase } }) => {
-    const { user } = await safeGetSession();
-    if (!user) redirect(303, '/login');
+export const load: PageServerLoad = async ({ locals: { supabase }, parent }) => {
+    const { userId } = await parent();
+    if (!userId) redirect(303, '/login');
 
-    const { data: settings, error } = await supabase
+    const { data: settings } = await supabase
         .from('settings')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .single();
 
-    if (error) console.error(error);
+    if (!settings) redirect(303, '/home'); // Should never happen but satisfies TS
 
     return { settings };
 };
@@ -61,7 +61,7 @@ export const actions: Actions = {
 
         await supabase.from('settings').upsert({
             user_id:       user.id,
-            theme:         form.get('theme'),
+            theme:         form.get('theme') as 'dark' | 'light',
             master_volume: Number(form.get('master_volume')),
             music_volume:  Number(form.get('music_volume')),
             sound_effects: form.get('sound_effects') === 'true',

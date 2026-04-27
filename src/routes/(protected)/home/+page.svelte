@@ -29,7 +29,7 @@
 <!-- HTML -->
 <div class = 'wrapper'>
     <main>
-        <span>User: {data.nickname}</span>
+        <span>User: {data.userNickname}</span>
 
         <Button variant = 'filled' onclick = {handleRankedClick} >
             Play Ranked Game

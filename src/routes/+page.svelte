@@ -7,13 +7,9 @@
     async function handleSignupClick() { await goto('/signup'); }
     
     let variant: "elevated" | "filled" | "tonal" | "outlined" | "text" = $state("filled");
-    let action: "click" | "link" | "toggle" = $state("click");
     let square = $state(false);
-    let iconType: "none" | "left" | "full" = $state("none");
     const sizes = ["xs", "s", "m", "l", "xl"] as const;
-    const sizeLabels = ["Extra small", "Small", "Medium", "Large", "Extra large"] as const;
     let sizeIndex = $state(1);
-    let enabled = $state(true);
 </script>
 
 LANDING PAGE

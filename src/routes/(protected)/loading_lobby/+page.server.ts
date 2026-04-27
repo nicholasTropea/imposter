@@ -17,11 +17,11 @@ import type { PageServerLoad } from './$types';
  * @returns The UUID of the ranked game the user has been assigned to.
  */
 export const load: PageServerLoad = async ({ locals, parent }) => {
-    const { user } = await parent();
-    if (!user) redirect(303, '/login');
+    const { userId } = await parent();
+    if (!userId) redirect(303, '/login');
 
     const { data: gameId, error } = await locals.supabase
-        .rpc('join_or_create_ranked_game', { p_user_id: user.id });
+        .rpc('join_or_create_ranked_game', { p_user_id: userId });
 
     if (error) throw error;
 

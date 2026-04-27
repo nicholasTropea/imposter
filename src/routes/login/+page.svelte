@@ -1,7 +1,5 @@
 <script>
     import { TextFieldOutlined, Button } from 'm3-svelte';
-
-    import LabeledSwitch from '$components/ui/LabeledSwitch.svelte';
 </script>
 
 
