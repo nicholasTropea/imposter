@@ -15,9 +15,10 @@ import type { LayoutServerLoad } from './$types';
  * theme if authenticated, or `null` if unauthenticated.
  */
 export const load: LayoutServerLoad = async ({ locals: { safeGetSession, supabase } }) => {
-    const { session, user } = await safeGetSession();
+    const { user } = await safeGetSession();
 
     let settings = null;
+
     if (user) {
         const { data } = await supabase
             .from('settings')
@@ -28,5 +29,10 @@ export const load: LayoutServerLoad = async ({ locals: { safeGetSession, supabas
         settings = data;
     }
     
-    return { session, user, settings };
+    return {
+        userId: user?.id ?? null,
+        userEmail: user?.email ?? null,
+        userNickname: user?.user_metadata?.nickname ?? null,
+        settings
+    };
 };
