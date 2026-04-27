@@ -7,7 +7,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Rr6oCKiJQq50K29kWwhdhfIO4LJyRdAWXfT8NUuUODfqnt5ONTZih4DadPPMlwB
+\restrict bG5fhBOkXH0ctUwvlF82nBKNtDpwrzRmucbXlJYHVL91ux6idg8Ba0OoqGaaxYR
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg24.04+1)
@@ -36,6 +36,16 @@ CREATE SCHEMA public;
 --
 
 COMMENT ON SCHEMA public IS 'standard public schema';
+
+
+--
+-- Name: theme_type; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.theme_type AS ENUM (
+    'dark',
+    'light'
+);
 
 
 --
@@ -483,12 +493,12 @@ CREATE TABLE public.ranked_games (
 
 CREATE TABLE public.settings (
     user_id uuid NOT NULL,
-    theme text DEFAULT 'dark'::text,
-    master_volume integer DEFAULT 100,
-    music_volume integer DEFAULT 100,
-    sound_effects boolean DEFAULT true,
-    game_invites boolean DEFAULT true,
-    daily_rewards boolean DEFAULT true
+    theme public.theme_type DEFAULT 'dark'::public.theme_type NOT NULL,
+    master_volume integer DEFAULT 100 NOT NULL,
+    music_volume integer DEFAULT 100 NOT NULL,
+    sound_effects boolean DEFAULT true NOT NULL,
+    game_invites boolean DEFAULT true NOT NULL,
+    daily_rewards boolean DEFAULT true NOT NULL
 );
 
 
@@ -686,5 +696,5 @@ ALTER TABLE ONLY public.settings
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Rr6oCKiJQq50K29kWwhdhfIO4LJyRdAWXfT8NUuUODfqnt5ONTZih4DadPPMlwB
+\unrestrict bG5fhBOkXH0ctUwvlF82nBKNtDpwrzRmucbXlJYHVL91ux6idg8Ba0OoqGaaxYR
 

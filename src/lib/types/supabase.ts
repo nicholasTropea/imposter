@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      game_words: {
+        Row: {
+          game_id: string
+          id: string
+          player_id: string
+          round_number: number
+          word: string | null
+        }
+        Insert: {
+          game_id: string
+          id?: string
+          player_id: string
+          round_number: number
+          word?: string | null
+        }
+        Update: {
+          game_id?: string
+          id?: string
+          player_id?: string
+          round_number?: number
+          word?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_words_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "ranked_games"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "game_words_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       players: {
         Row: {
           civilian_wins: number
@@ -48,17 +87,26 @@ export type Database = {
         Row: {
           game_id: string
           joined_at: string | null
+          last_seen: string | null
+          role: string | null
           user_id: string
+          word: string | null
         }
         Insert: {
           game_id: string
           joined_at?: string | null
+          last_seen?: string | null
+          role?: string | null
           user_id: string
+          word?: string | null
         }
         Update: {
           game_id?: string
           joined_at?: string | null
+          last_seen?: string | null
+          role?: string | null
           user_id?: string
+          word?: string | null
         }
         Relationships: [
           {
@@ -79,55 +127,109 @@ export type Database = {
       }
       ranked_games: {
         Row: {
+          active_player_id: string | null
           created_at: string | null
           id: string
           max_players: number
+          phase: string
+          phase_deadline: string | null
           player_count: number
+          round_number: number
           status: string
+          turn_index: number
+          turn_order: string[]
+          words_id: number
         }
         Insert: {
+          active_player_id?: string | null
           created_at?: string | null
           id?: string
           max_players?: number
+          phase?: string
+          phase_deadline?: string | null
           player_count?: number
+          round_number?: number
           status?: string
+          turn_index?: number
+          turn_order?: string[]
+          words_id: number
         }
         Update: {
+          active_player_id?: string | null
           created_at?: string | null
           id?: string
           max_players?: number
+          phase?: string
+          phase_deadline?: string | null
           player_count?: number
+          round_number?: number
           status?: string
+          turn_index?: number
+          turn_order?: string[]
+          words_id?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ranked_games_active_player_id_fkey"
+            columns: ["active_player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ranked_games_words_id_fkey"
+            columns: ["words_id"]
+            isOneToOne: false
+            referencedRelation: "words"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       settings: {
         Row: {
-          daily_rewards: boolean | null
-          game_invites: boolean | null
-          master_volume: number | null
-          music_volume: number | null
-          sound_effects: boolean | null
-          theme: string | null
+          daily_rewards: boolean
+          game_invites: boolean
+          master_volume: number
+          music_volume: number
+          sound_effects: boolean
+          theme: Database["public"]["Enums"]["theme_type"]
           user_id: string
         }
         Insert: {
-          daily_rewards?: boolean | null
-          game_invites?: boolean | null
-          master_volume?: number | null
-          music_volume?: number | null
-          sound_effects?: boolean | null
-          theme?: string | null
+          daily_rewards?: boolean
+          game_invites?: boolean
+          master_volume?: number
+          music_volume?: number
+          sound_effects?: boolean
+          theme?: Database["public"]["Enums"]["theme_type"]
           user_id: string
         }
         Update: {
-          daily_rewards?: boolean | null
-          game_invites?: boolean | null
-          master_volume?: number | null
-          music_volume?: number | null
-          sound_effects?: boolean | null
-          theme?: string | null
+          daily_rewards?: boolean
+          game_invites?: boolean
+          master_volume?: number
+          music_volume?: number
+          sound_effects?: boolean
+          theme?: Database["public"]["Enums"]["theme_type"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      words: {
+        Row: {
+          civilian_word: string
+          id: number
+          imposter_word: string
+        }
+        Insert: {
+          civilian_word: string
+          id?: number
+          imposter_word: string
+        }
+        Update: {
+          civilian_word?: string
+          id?: number
+          imposter_word?: string
         }
         Relationships: []
       }
@@ -136,13 +238,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      advance_turn: { Args: { p_game_id: string }; Returns: undefined }
       join_or_create_ranked_game: {
         Args: { p_user_id: string }
         Returns: string
       }
     }
     Enums: {
-      [_ in never]: never
+      theme_type: "dark" | "light"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -269,6 +372,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      theme_type: ["dark", "light"],
+    },
   },
 } as const
