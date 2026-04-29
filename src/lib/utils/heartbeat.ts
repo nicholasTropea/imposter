@@ -16,15 +16,23 @@
  * });
  */
 export function startHeartbeat(gameId: string): () => void {
-    const interval = setInterval(() => {
-        navigator.sendBeacon(
-            '/api/heartbeat',
-            new Blob(
-                [JSON.stringify({ gameId })],
-                { type: 'application/json' }
-            )
-        );
-    }, 5000);
+    const ping = () => navigator.sendBeacon(
+        '/api/heartbeat',
+        new Blob([JSON.stringify({ gameId })], { type: 'application/json' })
+    );
+    
+    const interval = setInterval(ping, 5000);
 
-    return () => clearInterval(interval);
+    // Immediate ping when tab becomes visible again after being backgrounded
+    // (used to prevent disconnection resulting from resource throttling like when testing
+    // with various clients open that consume a lot of resources )
+    const onVisibilityChange = () => {
+        if (document.visibilityState === 'visible') ping();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+        clearInterval(interval);
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+    }
 }

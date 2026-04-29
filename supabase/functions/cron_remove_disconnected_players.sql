@@ -3,6 +3,6 @@ SELECT cron.schedule(
     '15 seconds',
     $$
     DELETE FROM ranked_game_players
-    WHERE last_seen < now() - interval '15 seconds';
+    WHERE last_seen < now() - interval '45 seconds';
     $$
 );
