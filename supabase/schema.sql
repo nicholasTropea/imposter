@@ -2,12 +2,11 @@
 -- Regenerate with:
 -- pg_dump "postgresql://postgres.[PROJECT ID]:[DATABASE PASSWORD]@aws-1-eu-central-1.pooler.supabase.com:5432/postgres"
 -- --schema-only --schema=public --no-owner --no-privileges --file supabase/schema.sql
-
 --
 -- PostgreSQL database dump
 --
 
-\restrict bG5fhBOkXH0ctUwvlF82nBKNtDpwrzRmucbXlJYHVL91ux6idg8Ba0OoqGaaxYR
+\restrict abtNLRsQxdCYdodijT9WHNqi5LNfKRanzbEz4R1l0FNstp0Icve8Iw8X8uO3YUg
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg24.04+1)
@@ -36,6 +35,17 @@ CREATE SCHEMA public;
 --
 
 COMMENT ON SCHEMA public IS 'standard public schema';
+
+
+--
+-- Name: game_phase; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.game_phase AS ENUM (
+    'word_input',
+    'voting',
+    'results'
+);
 
 
 --
@@ -395,7 +405,7 @@ BEGIN
 
         -- Build a random turn order from all players in the game
         SELECT ARRAY(
-            SELECT id
+            SELECT user_id
             FROM ranked_game_players
             WHERE game_id = v_result_game_id
             ORDER BY random()
@@ -482,7 +492,7 @@ CREATE TABLE public.ranked_games (
     turn_index integer DEFAULT 0 NOT NULL,
     round_number integer DEFAULT 1 NOT NULL,
     active_player_id uuid,
-    phase text DEFAULT 'word_input'::text NOT NULL,
+    phase public.game_phase DEFAULT 'word_input'::public.game_phase NOT NULL,
     phase_deadline timestamp with time zone
 );
 
@@ -696,5 +706,5 @@ ALTER TABLE ONLY public.settings
 -- PostgreSQL database dump complete
 --
 
-\unrestrict bG5fhBOkXH0ctUwvlF82nBKNtDpwrzRmucbXlJYHVL91ux6idg8Ba0OoqGaaxYR
+\unrestrict abtNLRsQxdCYdodijT9WHNqi5LNfKRanzbEz4R1l0FNstp0Icve8Iw8X8uO3YUg
 

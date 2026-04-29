@@ -108,7 +108,7 @@ BEGIN
 
         -- Build a random turn order from all players in the game
         SELECT ARRAY(
-            SELECT id
+            SELECT user_id
             FROM ranked_game_players
             WHERE game_id = v_result_game_id
             ORDER BY random()

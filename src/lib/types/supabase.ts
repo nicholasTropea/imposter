@@ -131,7 +131,7 @@ export type Database = {
           created_at: string | null
           id: string
           max_players: number
-          phase: string
+          phase: Database["public"]["Enums"]["game_phase"]
           phase_deadline: string | null
           player_count: number
           round_number: number
@@ -145,7 +145,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           max_players?: number
-          phase?: string
+          phase?: Database["public"]["Enums"]["game_phase"]
           phase_deadline?: string | null
           player_count?: number
           round_number?: number
@@ -159,7 +159,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           max_players?: number
-          phase?: string
+          phase?: Database["public"]["Enums"]["game_phase"]
           phase_deadline?: string | null
           player_count?: number
           round_number?: number
@@ -245,6 +245,7 @@ export type Database = {
       }
     }
     Enums: {
+      game_phase: "word_input" | "voting" | "results"
       theme_type: "dark" | "light"
     }
     CompositeTypes: {
@@ -373,6 +374,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      game_phase: ["word_input", "voting", "results"],
       theme_type: ["dark", "light"],
     },
   },
