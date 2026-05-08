@@ -3,7 +3,7 @@
     import NavBar from '$components/ui/NavBar.svelte';
 
     import HomeIcon from '~icons/mdi/home';
-    import CheckIcon from '~icons/mdi/check-circle';
+    import PodiumIcon from '~icons/mdi/podium';
     import SettingsIcon from '~icons/mdi/gear';
 
     import { Button } from 'm3-svelte';
@@ -15,7 +15,7 @@
     // ── Navbar ─────────────────────────────────────────────────────────────────────────    
     const navItems = [
         { label: 'HOME', icon: HomeIcon, active: true },
-        { label: 'CHECK', icon: CheckIcon },
+        { label: 'LEADERBOARD', icon: PodiumIcon, handleClick: (() => goto('/leaderboard')) },
         { label: 'SETTINGS', icon: SettingsIcon, handleClick: (() => goto('/settings')) }
     ]; 
 

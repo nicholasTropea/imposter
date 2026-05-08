@@ -7,7 +7,7 @@
     import NavBar from '$components/ui/NavBar.svelte';
 
     import HomeIcon from '~icons/mdi/home';
-    import CheckIcon from '~icons/mdi/check-circle';
+    import PodiumIcon from '~icons/mdi/podium';
     import SettingsIcon from '~icons/mdi/gear';
 
     import { untrack } from 'svelte';
@@ -88,7 +88,7 @@
     // ── Navbar ─────────────────────────────────────────────────────────────────────────    
     const navItems = [
         { label: 'HOME', icon: HomeIcon, handleClick: (() => goto('/home')) },
-        { label: 'CHECK', icon: CheckIcon },
+        { label: 'LEADERBOARD', icon: PodiumIcon, handleClick: (() => goto('/leaderboard')) },
         { label: 'SETTINGS', icon: SettingsIcon, active: true }
     ];
 </script>
