@@ -14,39 +14,49 @@ export type Database = {
   }
   public: {
     Tables: {
-      game_words: {
+      game_rounds: {
         Row: {
           game_id: string
-          id: string
           player_id: string
           round_number: number
-          word: string | null
+          submitted_word: string | null
+          target_player_id: string | null
+          voted: boolean | null
         }
         Insert: {
           game_id: string
-          id?: string
           player_id: string
           round_number: number
-          word?: string | null
+          submitted_word?: string | null
+          target_player_id?: string | null
+          voted?: boolean | null
         }
         Update: {
           game_id?: string
-          id?: string
           player_id?: string
           round_number?: number
-          word?: string | null
+          submitted_word?: string | null
+          target_player_id?: string | null
+          voted?: boolean | null
         }
         Relationships: [
           {
-            foreignKeyName: "game_words_game_id_fkey"
+            foreignKeyName: "game_rounds_game_id_fkey"
             columns: ["game_id"]
             isOneToOne: false
             referencedRelation: "ranked_games"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "game_words_player_id_fkey"
+            foreignKeyName: "game_rounds_player_id_fkey"
             columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "game_rounds_target_player_id_fkey"
+            columns: ["target_player_id"]
             isOneToOne: false
             referencedRelation: "players"
             referencedColumns: ["id"]
@@ -129,6 +139,7 @@ export type Database = {
         Row: {
           active_player_id: string | null
           created_at: string | null
+          eliminated_role: string | null
           id: string
           max_players: number
           phase: Database["public"]["Enums"]["game_phase"]
@@ -138,11 +149,13 @@ export type Database = {
           status: string
           turn_index: number
           turn_order: string[]
+          winner: string | null
           words_id: number
         }
         Insert: {
           active_player_id?: string | null
           created_at?: string | null
+          eliminated_role?: string | null
           id?: string
           max_players?: number
           phase?: Database["public"]["Enums"]["game_phase"]
@@ -152,11 +165,13 @@ export type Database = {
           status?: string
           turn_index?: number
           turn_order?: string[]
+          winner?: string | null
           words_id: number
         }
         Update: {
           active_player_id?: string | null
           created_at?: string | null
+          eliminated_role?: string | null
           id?: string
           max_players?: number
           phase?: Database["public"]["Enums"]["game_phase"]
@@ -166,6 +181,7 @@ export type Database = {
           status?: string
           turn_index?: number
           turn_order?: string[]
+          winner?: string | null
           words_id?: number
         }
         Relationships: [
@@ -238,14 +254,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      advance_reveal: { Args: { p_game_id: string }; Returns: undefined }
+      advance_to_next_round: { Args: { p_game_id: string }; Returns: undefined }
       advance_turn: { Args: { p_game_id: string }; Returns: undefined }
+      cast_vote: {
+        Args: { p_game_id: string; p_target_id: string; p_voter_id: string }
+        Returns: undefined
+      }
+      check_game_end: { Args: { p_game_id: string }; Returns: undefined }
+      close_voting: { Args: { p_game_id: string }; Returns: undefined }
+      game_tick: { Args: never; Returns: undefined }
       join_or_create_ranked_game: {
         Args: { p_user_id: string }
         Returns: string
       }
+      tally_votes: { Args: { p_game_id: string }; Returns: undefined }
     }
     Enums: {
-      game_phase: "word_input" | "voting" | "results"
+      game_phase: "word_input" | "voting" | "results" | "reveal"
       theme_type: "dark" | "light"
     }
     CompositeTypes: {
@@ -374,7 +400,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      game_phase: ["word_input", "voting", "results"],
+      game_phase: ["word_input", "voting", "results", "reveal"],
       theme_type: ["dark", "light"],
     },
   },
