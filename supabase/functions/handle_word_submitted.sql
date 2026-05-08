@@ -24,7 +24,7 @@ END;
 $$;
 
 
-CREATE TRIGGER on_word_submitted
-    AFTER INSERT ON public.game_words
+CREATE OR REPLACE TRIGGER on_word_submitted
+    AFTER INSERT ON public.game_rounds
     FOR EACH ROW
     EXECUTE FUNCTION public.handle_word_submitted();

@@ -6,7 +6,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict abtNLRsQxdCYdodijT9WHNqi5LNfKRanzbEz4R1l0FNstp0Icve8Iw8X8uO3YUg
+\restrict V7H4AsLtzYYHh92OiR2p395SQ1z302BV7GSzDtH3508aU6sJBpykgbTdORNlFlP
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg24.04+1)
@@ -44,7 +44,8 @@ COMMENT ON SCHEMA public IS 'standard public schema';
 CREATE TYPE public.game_phase AS ENUM (
     'word_input',
     'voting',
-    'results'
+    'results',
+    'reveal'
 );
 
 
@@ -59,6 +60,87 @@ CREATE TYPE public.theme_type AS ENUM (
 
 
 --
+-- Name: advance_reveal(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.advance_reveal(p_game_id uuid) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_game          ranked_games%ROWTYPE;
+    v_new_index     int;
+    v_new_player_id uuid;
+BEGIN
+    SELECT * INTO v_game
+    FROM ranked_games
+    WHERE id = p_game_id
+    FOR UPDATE;
+
+    -- guard: only run during reveal phase
+    IF v_game.phase != 'reveal' THEN
+        RETURN;
+    END IF;
+
+    -- advance turn index
+    v_new_index := v_game.turn_index + 1;
+
+    -- last player just revealed -> move to voting
+    IF v_new_index >= array_length(v_game.turn_order, 1) THEN
+        UPDATE ranked_games SET
+            active_player_id = NULL,
+            turn_index       = 0,
+            phase            = 'voting',
+            phase_deadline   = now() + interval '60 seconds'
+        WHERE id = p_game_id;
+
+    -- otherwise -> next player's word_input turn
+    ELSE
+        v_new_player_id := v_game.turn_order[v_new_index + 1]; -- 1-based in postgres
+
+        UPDATE ranked_games SET
+            turn_index       = v_new_index,
+            active_player_id = v_new_player_id,
+            phase            = 'word_input',
+            phase_deadline   = now() + interval '15 seconds'
+        WHERE id = p_game_id;
+    END IF;
+END;
+$$;
+
+
+--
+-- Name: advance_to_next_round(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.advance_to_next_round(p_game_id uuid) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_game ranked_games%ROWTYPE;
+BEGIN
+    SELECT * INTO v_game
+    FROM ranked_games
+    WHERE id = p_game_id
+    FOR UPDATE;
+
+    -- Guard: only act if still in results phase
+    IF v_game.phase != 'results' THEN
+        RETURN;
+    END IF;
+
+    UPDATE ranked_games SET
+        phase            = 'word_input',
+        round_number     = v_game.round_number + 1,
+        turn_index       = 0,
+        active_player_id = v_game.turn_order[1], -- 1-based in Postgres
+        eliminated_role  = NULL,
+        phase_deadline   = now() + interval '15 seconds'
+    WHERE id = p_game_id;
+END;
+$$;
+
+
+--
 -- Name: advance_turn(uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -69,7 +151,7 @@ DECLARE
     v_game              ranked_games%ROWTYPE;
     v_new_index         int;
     v_new_player_id     uuid;
-    v_game_words_row_id uuid;
+    v_game_rounds_row_id uuid;
 BEGIN
     -- Lock the game row to prevent concurrent execution
     -- (e.g. trigger and cron firing at the same time)
@@ -77,7 +159,7 @@ BEGIN
     FROM ranked_games
     WHERE id = p_game_id
     FOR UPDATE;
-
+    
     -- Guard: only run during word_input phase
     -- If the phase already changed (e.g. cron ran after trigger already advanced),
     -- this is a no-op
@@ -90,9 +172,9 @@ BEGIN
         RETURN;
     END IF;
 
-    -- uuid if the player voted, NULL otherwise
-    SELECT id INTO v_game_words_row_id
-    FROM game_words
+    -- uuid if the player submitted, NULL otherwise
+    SELECT game_id INTO v_game_rounds_row_id
+    FROM game_rounds
     WHERE game_id = p_game_id
     AND player_id = v_game.active_player_id
     AND round_number = v_game.round_number;
@@ -100,42 +182,250 @@ BEGIN
 
     -- If the deadline hasn't passed AND the active player hasn't submitted yet,
     -- do nothing (called too early — shouldn't happen but safe to guard)
-    IF v_game.phase_deadline > now() AND v_game_words_row_id IS NULL THEN
+    IF v_game.phase_deadline > now() AND v_game_rounds_row_id IS NULL THEN
         RETURN;
     END IF;
 
     -- If the active player timed out (deadline passed) and has no word yet,
     -- insert a NULL word row on their behalf
-    IF v_game_words_row_id IS NULL THEN
-        INSERT INTO game_words (game_id, player_id, word, round_number)
-        VALUES (p_game_id, v_game.active_player_id, NULL, v_game.round_number);
+    IF v_game_rounds_row_id IS NULL THEN
+        INSERT INTO game_rounds (
+            game_id,
+            player_id,
+            round_number,
+            submitted_word,
+            target_player_id,
+            voted
+        )
+        VALUES (
+            p_game_id,
+            v_game.active_player_id,
+            v_game.round_number,
+            NULL,
+            NULL,
+            FALSE
+        );
     END IF;
 
-    -- If v_game_words_row_id isn't null then the player correctly input the word before
-    -- the timer ran out and just advance the turn
+    -- transition to reveal phase
+    UPDATE ranked_games SET
+        phase = 'reveal',
+        phase_deadline = now() + interval '5 seconds'
+    WHERE ranked_games.id = p_game_id;
+END;
+$$;
 
-    -- Advance turn index
-    v_new_index := v_game.turn_index + 1;
 
-    -- Last player's turn just ended then move to voting phase
-    IF v_new_index >= array_length(v_game.turn_order, 1) THEN
-        UPDATE ranked_games SET
-            active_player_id = NULL,
-            turn_index       = 0,
-            phase            = 'voting',
-            phase_deadline   = now() + interval '60 seconds'
-        WHERE id = p_game_id;
+--
+-- Name: cast_vote(uuid, uuid, uuid); Type: FUNCTION; Schema: public; Owner: -
+--
 
-    -- Otherwise -> advance to next player
-    ELSE
-        v_new_player_id := v_game.turn_order[v_new_index + 1]; -- 1-based in Postgres
+CREATE FUNCTION public.cast_vote(p_game_id uuid, p_voter_id uuid, p_target_id uuid) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_turn_order     uuid[];                -- active players in the game
+    v_vote_count     int;                   -- votes cast so far this round
+    v_round          int;                   -- current round number
+    v_round_row      game_rounds%ROWTYPE;   -- the voter's row for this round
+BEGIN
+    -- lock the game row for the duration of the transaction.
+    -- this prevents two players submitting at the same time and both missing the
+    -- phase transition
+    SELECT turn_order, round_number
+    INTO v_turn_order, v_round
+    FROM ranked_games
+    WHERE id = p_game_id
+    AND phase = 'voting'
+    FOR UPDATE;
 
-        UPDATE ranked_games SET
-            turn_index       = v_new_index,
-            active_player_id = v_new_player_id,
-            phase_deadline   = now() + interval '15 seconds'
-        WHERE id = p_game_id;
+    -- guard: game not found or not in voting phase
+    IF NOT FOUND THEN
+        RETURN;
     END IF;
+
+    -- fetch the voter's game_rounds row for this round.
+    -- this row is created during the word_input phase upon word submit.
+    SELECT * INTO v_round_row 
+    FROM game_rounds
+    WHERE game_id = p_game_id
+    AND player_id = p_voter_id
+    AND round_number = v_round;
+
+    -- guard: voter has no round row, shouldn't happen in normal flow
+    IF v_round_row IS NULL THEN
+        RETURN;
+    END IF;
+
+    -- guard: target is not an active player (in game and not eliminated)
+    IF (
+        p_target_id IS NOT NULL AND
+        NOT (p_target_id = ANY(v_turn_order))
+    ) THEN
+        RETURN;
+    END IF;
+
+    -- guard: player already voted that target this round
+    IF (
+        v_round_row.voted = true AND
+        v_round_row.target_player_id IS NOT DISTINCT FROM p_target_id
+    ) THEN
+        RETURN;
+    END IF;
+
+    -- record the vote.
+    -- target_player_id = NULL means the player chose to skip.
+    UPDATE game_rounds
+    SET target_player_id = p_target_id, voted = true
+    WHERE game_id = p_game_id
+    AND player_id = p_voter_id
+    AND round_number = v_round;
+
+    -- count how many players have voted so far this round (including skips)
+    SELECT COUNT(*) INTO v_vote_count
+    FROM game_rounds
+    WHERE game_id = p_game_id
+    AND round_number = v_round
+    AND voted = TRUE;
+
+    -- if not everyone has voted yet, nothing else to do
+    -- TODO: v_player_count must account for eliminated players in future rounds
+    IF v_vote_count < array_length(v_turn_order, 1) THEN
+        RETURN;
+    END IF;
+
+    -- every player has voted
+    PERFORM tally_votes(p_game_id);
+END;
+$$;
+
+
+--
+-- Name: check_game_end(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.check_game_end(p_game_id uuid) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_turn_order     uuid[];
+    v_spy_count      int;
+    v_imposter_count int;
+    v_civilian_count int;
+    v_winner         text;
+BEGIN
+    SELECT turn_order INTO v_turn_order
+    FROM ranked_games
+    WHERE id = p_game_id;
+
+    SELECT
+        COUNT(*) FILTER (WHERE role = 'spy'),
+        COUNT(*) FILTER (WHERE role = 'imposter'),
+        COUNT(*) FILTER (WHERE role = 'civilian')  
+    INTO v_spy_count, v_imposter_count, v_civilian_count
+    FROM ranked_game_players
+    WHERE game_id = p_game_id
+    AND user_id = ANY(v_turn_order);
+
+    IF (
+        (v_spy_count > 0 AND v_imposter_count = 0 AND v_civilian_count = 0) OR
+        (v_spy_count > 0 AND array_length(v_turn_order, 1) = 2)
+    ) THEN
+        v_winner := 'spy';
+
+    ELSIF (
+        (v_imposter_count > 0 AND v_spy_count = 0 AND v_civilian_count = 0) OR
+        (v_imposter_count > 0 AND v_spy_count = 0 AND array_length(v_turn_order, 1) = 2)
+    ) THEN
+        v_winner := 'imposter';
+
+    ELSIF (v_civilian_count > 0 AND v_spy_count = 0 AND v_imposter_count = 0) THEN
+        v_winner := 'civilian';
+
+    END IF;
+
+    IF v_winner IS NULL THEN
+        RETURN;
+    END IF;
+
+    -- +25 to survived winners, -5 to survived losers
+    UPDATE players
+    SET elo = elo + CASE
+        WHEN rgp.role = v_winner THEN 25
+        ELSE -5
+    END
+    FROM ranked_game_players rgp
+    WHERE players.id = rgp.user_id
+    AND rgp.game_id = p_game_id
+    AND rgp.user_id = ANY(v_turn_order); -- not eliminated
+
+    UPDATE ranked_games SET
+        status = 'finished',
+        phase  = 'results',
+        winner = v_winner
+    WHERE id = p_game_id;
+END;
+$$;
+
+
+--
+-- Name: close_voting(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.close_voting(p_game_id uuid) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- guard: only act if still in voting phase
+    IF NOT EXISTS (
+        SELECT 1 FROM ranked_games
+        WHERE id = p_game_id
+        AND phase = 'voting'
+    ) THEN
+        RETURN;
+    END IF;
+
+    PERFORM tally_votes(p_game_id);
+END;
+$$;
+
+
+--
+-- Name: game_tick(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.game_tick() RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- advance expired word_input turns
+    PERFORM public.advance_turn(id)
+    FROM ranked_games
+    WHERE phase = 'word_input'
+    AND status != 'finished'
+    AND phase_deadline < now()
+    AND active_player_id IS NOT NULL;
+
+    -- advance from reveal phase
+    PERFORM public.advance_reveal(id)
+    FROM ranked_games
+    WHERE phase = 'reveal'
+    AND status != 'finished'
+    AND phase_deadline < now();
+
+    -- close expired voting
+    PERFORM public.close_voting(id)
+    FROM ranked_games
+    WHERE phase = 'voting'
+    AND status != 'finished'
+    AND phase_deadline < now();
+
+    -- start next round
+    PERFORM public.advance_to_next_round(id)
+    FROM ranked_games
+    WHERE phase = 'results'
+    AND status != 'finished'
+    AND phase_deadline < now();
 END;
 $$;
 
@@ -200,22 +490,30 @@ DECLARE
     v_removed_player_position   int;
     v_new_players_array         uuid[];
     v_new_turn_index            int;
-
 BEGIN
-    -- Decrement player count
-    UPDATE ranked_games
-    SET player_count = player_count - 1
-    WHERE id = OLD.game_id; -- OLD refers to the deleted row
-
     -- Get game information
     SELECT * INTO v_game
     FROM ranked_games
     WHERE ranked_games.id = OLD.game_id
     FOR UPDATE; -- locks the row until the transaction ends (handles simultaneus disconnections)
 
+    -- Decrement player count
+    UPDATE ranked_games
+    SET player_count = player_count - 1
+    WHERE id = OLD.game_id; -- OLD refers to the deleted row
+
     -- If game hasn't started then only decrease the count
     IF v_game.status != 'in_progress' THEN
         RETURN OLD;
+    END IF;
+
+    -- ── GAME IN PROGRESS ───────────────────────────────────────────────────────────────
+
+    -- detract points from the leaving player's elo if he's not eliminated already
+    IF (OLD.user_id = ANY(v_game.turn_order)) THEN
+        UPDATE players
+        SET elo = elo - 20
+        WHERE id = OLD.user_id;
     END IF;
 
     -- Retrieve 0-based index of the deleted player
@@ -227,12 +525,12 @@ BEGIN
     FROM unnest(v_game.turn_order) WITH ORDINALITY AS t(pid, i)
     WHERE pid = OLD.user_id;
 
-    -- Edge case in which player was not in turn_order
+    -- player was not in turn_order (has been eliminated)
     IF v_removed_player_position IS NULL THEN
         RETURN OLD;
     END IF;
 
-      -- Build the new turn_order array with the leaving player removed (keeps order)
+    -- Build the new turn_order array with the leaving player removed (keeps order)
     SELECT ARRAY(
         SELECT pid
         FROM unnest(v_game.turn_order) AS t(pid)
@@ -266,14 +564,46 @@ BEGIN
         v_new_turn_index := 0;
     END IF;
 
+    -- restart the voting phase in case it was active
+    IF v_game.phase = 'voting' THEN
+        -- wipe all votes for this round
+        UPDATE game_rounds SET
+            target_player_id = NULL,
+            voted = FALSE
+        WHERE game_id = OLD.game_id
+        AND round_number = v_game.round_number;
+
+        -- delete all entries of the leaving player
+        DELETE FROM game_rounds
+        WHERE game_id = OLD.game_id
+        AND player_id = OLD.user_id;
+    END IF;
+
     -- Update the game with the new turn order, corrected index,
     -- and the new active player derived from the updated array.
     -- Postgres arrays are 1-based, so add 1 to the 0-based index.
+    -- update phase_deadline if the game is in the voting phase or if the leaving
+    -- player is the active one, resetting the timer for the next player
     UPDATE ranked_games SET
         turn_order       = v_new_players_array,
         turn_index       = v_new_turn_index,
-        active_player_id = v_new_players_array[v_new_turn_index + 1]
+        active_player_id = v_new_players_array[v_new_turn_index + 1],
+        phase_deadline = CASE
+                            WHEN v_game.phase = 'voting'
+                            THEN now() + interval '60 seconds'
+
+                            WHEN (
+                                v_game.phase = 'word_input' AND
+                                v_game.active_player_id = OLD.user_id
+                            )
+                            THEN now() + interval '15 seconds'
+
+                            ELSE phase_deadline
+                         END
     WHERE ranked_games.id = OLD.game_id;
+
+    -- check if the game should end
+    PERFORM check_game_end(OLD.game_id);
 
     RETURN OLD;
 END;
@@ -378,7 +708,6 @@ BEGIN
         SET role = CASE ranked.row_num
             WHEN 1 THEN 'spy'
             WHEN 2 THEN 'imposter'
-            WHEN 3 THEN 'imposter'
             ELSE        'civilian'
         END
         FROM (
@@ -431,21 +760,164 @@ END;
 $$;
 
 
+--
+-- Name: tally_votes(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.tally_votes(p_game_id uuid) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_round             int;
+    v_skips             int;
+    v_max_votes         int;
+    v_eliminated_id     uuid;
+    v_eliminated_role   text;
+    v_turn_order        uuid[];
+    v_new_turn_order    uuid[];
+    v_turn_index        int;
+    v_new_turn_index    int;
+    v_removed_position  int;
+BEGIN
+    -- get round number
+    SELECT round_number, turn_order, turn_index INTO v_round, v_turn_order, v_turn_index
+    FROM ranked_games
+    WHERE id = p_game_id;
+
+    -- count how many players chose to skip
+    -- COUNT() returns 0 if no row is found
+    SELECT COUNT(*) INTO v_skips
+    FROM game_rounds
+    WHERE game_id = p_game_id
+    AND round_number = v_round
+    AND target_player_id IS NULL
+    AND voted = TRUE;
+
+    -- find the highest number of votes any single player received.
+    -- COALESCE handles the edge case where v_max_votes would be NULL
+    -- (since MAX() returns NULL if no rows are found),
+    -- turning NULL into 0 making the comparison still work
+    -- COALESCE(a, b, ..., z) picks the first (left to right) value != NULL
+    SELECT MAX(vote_count) INTO v_max_votes
+    FROM (
+        SELECT COUNT(*) AS vote_count
+        FROM game_rounds
+        WHERE game_id = p_game_id
+        AND round_number = v_round
+        AND target_player_id IS NOT NULL
+        AND voted = TRUE
+        GROUP BY target_player_id
+    ) AS counts;
+
+    -- if skips are equal to or exceed the top player vote count, no one is eliminated
+    IF v_skips >= COALESCE(v_max_votes, 0) THEN
+        UPDATE ranked_games SET
+            phase            = 'results',
+            active_player_id = NULL, -- signals (no elimination this round)
+            phase_deadline   = now() + interval '10 seconds'
+        WHERE id = p_game_id;
+        RETURN;
+    END IF;
+
+    -- pick a random player among those tied at the top vote count
+    SELECT target_player_id INTO v_eliminated_id
+    FROM game_rounds
+    WHERE game_id = p_game_id
+    AND round_number = v_round
+    AND target_player_id IS NOT NULL
+    GROUP BY target_player_id
+    HAVING COUNT(*) = v_max_votes
+    ORDER BY random()
+    LIMIT 1;
+
+    -- retrieve 0-based index of the deleted player
+    -- unnest expands the array into rows, ORDINALITY adds indices, so it returns:
+    -- pid   i
+    --  A    1
+    --  B    2
+    SELECT i - 1 INTO v_removed_position
+    FROM unnest(v_turn_order) WITH ORDINALITY AS t(pid, i)
+    WHERE pid = v_eliminated_id;
+
+    -- build the new turn_order array with the leaving player removed (keeps order)
+    SELECT ARRAY(
+        SELECT pid
+        FROM unnest(v_turn_order) AS t(pid)
+        WHERE pid != v_eliminated_id
+    ) INTO v_new_turn_order;
+
+    -- adjust turn_index based on where the removed player was relative
+    -- to the current turn:
+    --
+    --      case 1: removed player was BEFORE current index
+    --          → every player shifted left by 1, so we decrement index to
+    --          keep pointing at the same player
+    --
+    --      case 2: removed player was AT current index
+    --          → their slot is gone, the next player slides into this index
+    --          automatically, so no change needed
+    --
+    --      case 3: removed player was AFTER current index
+    --          → nothing before or at the current position changed, no adjustment
+    IF v_removed_position < v_turn_index THEN
+        v_new_turn_index := v_turn_index - 1;
+    ELSE
+        v_new_turn_index := v_turn_index;
+    END IF;
+
+    -- guard: if the index now points past the end of the array
+    -- (e.g. the last player in the order left), wrap back to 0.
+    -- (second parameter is the dimension of the array (1D in this case))
+    IF array_length(v_new_turn_order, 1) IS NULL
+    OR v_new_turn_index >= array_length(v_new_turn_order, 1) THEN
+        v_new_turn_index := 0;
+    END IF;
+
+    -- look up the eliminated player's role
+    SELECT role INTO v_eliminated_role
+    FROM ranked_game_players
+    WHERE game_id = p_game_id
+    AND user_id = v_eliminated_id;
+
+    -- deduct elo from the eliminated player
+    UPDATE players SET
+        elo = elo - 10
+    WHERE id = v_eliminated_id;
+
+    -- transition to results phase with the eliminated player
+    UPDATE ranked_games SET
+        phase               =      'results',
+        active_player_id    =      v_eliminated_id,
+        eliminated_role     =      v_eliminated_role,
+        turn_order          =      v_new_turn_order,
+        turn_index          =      v_new_turn_index,
+        phase_deadline      =      now() + interval '10 seconds'
+    WHERE id = p_game_id;
+
+    -- check if the game should end
+    PERFORM check_game_end(p_game_id);
+END;
+$$;
+
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
 
 --
--- Name: game_words; Type: TABLE; Schema: public; Owner: -
+-- Name: game_rounds; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.game_words (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
+CREATE TABLE public.game_rounds (
     game_id uuid NOT NULL,
     player_id uuid NOT NULL,
-    word text,
-    round_number integer NOT NULL
+    round_number integer NOT NULL,
+    submitted_word text,
+    target_player_id uuid,
+    voted boolean DEFAULT false
 );
+
+ALTER TABLE ONLY public.game_rounds REPLICA IDENTITY FULL;
 
 
 --
@@ -493,7 +965,9 @@ CREATE TABLE public.ranked_games (
     round_number integer DEFAULT 1 NOT NULL,
     active_player_id uuid,
     phase public.game_phase DEFAULT 'word_input'::public.game_phase NOT NULL,
-    phase_deadline timestamp with time zone
+    phase_deadline timestamp with time zone,
+    eliminated_role text,
+    winner text
 );
 
 
@@ -538,19 +1012,11 @@ ALTER TABLE public.words ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
 
 
 --
--- Name: game_words game_words_game_id_player_id_round_number_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: game_rounds game_rounds_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.game_words
-    ADD CONSTRAINT game_words_game_id_player_id_round_number_key UNIQUE (game_id, player_id, round_number);
-
-
---
--- Name: game_words game_words_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.game_words
-    ADD CONSTRAINT game_words_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.game_rounds
+    ADD CONSTRAINT game_rounds_pkey PRIMARY KEY (game_id, player_id, round_number);
 
 
 --
@@ -618,10 +1084,10 @@ ALTER TABLE ONLY public.words
 
 
 --
--- Name: game_words before_word_submitted; Type: TRIGGER; Schema: public; Owner: -
+-- Name: game_rounds before_word_submitted; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER before_word_submitted BEFORE INSERT ON public.game_words FOR EACH ROW EXECUTE FUNCTION public.guard_word_submission();
+CREATE TRIGGER before_word_submitted BEFORE INSERT ON public.game_rounds FOR EACH ROW EXECUTE FUNCTION public.guard_word_submission();
 
 
 --
@@ -632,26 +1098,34 @@ CREATE TRIGGER on_player_leave AFTER DELETE ON public.ranked_game_players FOR EA
 
 
 --
--- Name: game_words on_word_submitted; Type: TRIGGER; Schema: public; Owner: -
+-- Name: game_rounds on_word_submitted; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER on_word_submitted AFTER INSERT ON public.game_words FOR EACH ROW EXECUTE FUNCTION public.handle_word_submitted();
-
-
---
--- Name: game_words game_words_game_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.game_words
-    ADD CONSTRAINT game_words_game_id_fkey FOREIGN KEY (game_id) REFERENCES public.ranked_games(id) ON DELETE CASCADE;
+CREATE TRIGGER on_word_submitted AFTER INSERT ON public.game_rounds FOR EACH ROW EXECUTE FUNCTION public.handle_word_submitted();
 
 
 --
--- Name: game_words game_words_player_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: game_rounds game_rounds_game_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.game_words
-    ADD CONSTRAINT game_words_player_id_fkey FOREIGN KEY (player_id) REFERENCES public.players(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.game_rounds
+    ADD CONSTRAINT game_rounds_game_id_fkey FOREIGN KEY (game_id) REFERENCES public.ranked_games(id) ON DELETE CASCADE;
+
+
+--
+-- Name: game_rounds game_rounds_player_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.game_rounds
+    ADD CONSTRAINT game_rounds_player_id_fkey FOREIGN KEY (player_id) REFERENCES public.players(id) ON DELETE CASCADE;
+
+
+--
+-- Name: game_rounds game_rounds_target_player_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.game_rounds
+    ADD CONSTRAINT game_rounds_target_player_id_fkey FOREIGN KEY (target_player_id) REFERENCES public.players(id) ON DELETE SET NULL;
 
 
 --
@@ -706,5 +1180,5 @@ ALTER TABLE ONLY public.settings
 -- PostgreSQL database dump complete
 --
 
-\unrestrict abtNLRsQxdCYdodijT9WHNqi5LNfKRanzbEz4R1l0FNstp0Icve8Iw8X8uO3YUg
+\unrestrict V7H4AsLtzYYHh92OiR2p395SQ1z302BV7GSzDtH3508aU6sJBpykgbTdORNlFlP
 

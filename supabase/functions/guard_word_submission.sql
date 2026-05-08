@@ -17,7 +17,7 @@ BEGIN
 END;
 $$;
 
-CREATE TRIGGER before_word_submitted
-    BEFORE INSERT ON public.game_words
+CREATE OR REPLACE TRIGGER before_word_submitted
+    BEFORE INSERT ON public.game_rounds
     FOR EACH ROW
     EXECUTE FUNCTION public.guard_word_submission();

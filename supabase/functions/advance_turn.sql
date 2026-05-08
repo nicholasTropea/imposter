@@ -1,7 +1,7 @@
 -- ============================================================
 -- advance_turn(p_game_id uuid)
 -- Called by:
---   1. Trigger on game_words INSERT (only when active player submits)
+--   1. Trigger on game_rounds INSERT (only when active player submits)
 --   2. pg_cron job every 5 seconds for expired phase_deadline
 -- ============================================================
 
@@ -13,7 +13,7 @@ DECLARE
     v_game              ranked_games%ROWTYPE;
     v_new_index         int;
     v_new_player_id     uuid;
-    v_game_words_row_id uuid;
+    v_game_rounds_row_id uuid;
 BEGIN
     -- Lock the game row to prevent concurrent execution
     -- (e.g. trigger and cron firing at the same time)
@@ -21,7 +21,7 @@ BEGIN
     FROM ranked_games
     WHERE id = p_game_id
     FOR UPDATE;
-
+    
     -- Guard: only run during word_input phase
     -- If the phase already changed (e.g. cron ran after trigger already advanced),
     -- this is a no-op
@@ -34,9 +34,9 @@ BEGIN
         RETURN;
     END IF;
 
-    -- uuid if the player voted, NULL otherwise
-    SELECT id INTO v_game_words_row_id
-    FROM game_words
+    -- uuid if the player submitted, NULL otherwise
+    SELECT game_id INTO v_game_rounds_row_id
+    FROM game_rounds
     WHERE game_id = p_game_id
     AND player_id = v_game.active_player_id
     AND round_number = v_game.round_number;
@@ -44,41 +44,35 @@ BEGIN
 
     -- If the deadline hasn't passed AND the active player hasn't submitted yet,
     -- do nothing (called too early — shouldn't happen but safe to guard)
-    IF v_game.phase_deadline > now() AND v_game_words_row_id IS NULL THEN
+    IF v_game.phase_deadline > now() AND v_game_rounds_row_id IS NULL THEN
         RETURN;
     END IF;
 
     -- If the active player timed out (deadline passed) and has no word yet,
     -- insert a NULL word row on their behalf
-    IF v_game_words_row_id IS NULL THEN
-        INSERT INTO game_words (game_id, player_id, word, round_number)
-        VALUES (p_game_id, v_game.active_player_id, NULL, v_game.round_number);
+    IF v_game_rounds_row_id IS NULL THEN
+        INSERT INTO game_rounds (
+            game_id,
+            player_id,
+            round_number,
+            submitted_word,
+            target_player_id,
+            voted
+        )
+        VALUES (
+            p_game_id,
+            v_game.active_player_id,
+            v_game.round_number,
+            NULL,
+            NULL,
+            FALSE
+        );
     END IF;
 
-    -- If v_game_words_row_id isn't null then the player correctly input the word before
-    -- the timer ran out and just advance the turn
-
-    -- Advance turn index
-    v_new_index := v_game.turn_index + 1;
-
-    -- Last player's turn just ended then move to voting phase
-    IF v_new_index >= array_length(v_game.turn_order, 1) THEN
-        UPDATE ranked_games SET
-            active_player_id = NULL,
-            turn_index       = 0,
-            phase            = 'voting',
-            phase_deadline   = now() + interval '60 seconds'
-        WHERE id = p_game_id;
-
-    -- Otherwise -> advance to next player
-    ELSE
-        v_new_player_id := v_game.turn_order[v_new_index + 1]; -- 1-based in Postgres
-
-        UPDATE ranked_games SET
-            turn_index       = v_new_index,
-            active_player_id = v_new_player_id,
-            phase_deadline   = now() + interval '15 seconds'
-        WHERE id = p_game_id;
-    END IF;
+    -- transition to reveal phase
+    UPDATE ranked_games SET
+        phase = 'reveal',
+        phase_deadline = now() + interval '5 seconds'
+    WHERE ranked_games.id = p_game_id;
 END;
 $$;

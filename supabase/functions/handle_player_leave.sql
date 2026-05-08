@@ -12,22 +12,30 @@ DECLARE
     v_removed_player_position   int;
     v_new_players_array         uuid[];
     v_new_turn_index            int;
-
 BEGIN
-    -- Decrement player count
-    UPDATE ranked_games
-    SET player_count = player_count - 1
-    WHERE id = OLD.game_id; -- OLD refers to the deleted row
-
     -- Get game information
     SELECT * INTO v_game
     FROM ranked_games
     WHERE ranked_games.id = OLD.game_id
     FOR UPDATE; -- locks the row until the transaction ends (handles simultaneus disconnections)
 
+    -- Decrement player count
+    UPDATE ranked_games
+    SET player_count = player_count - 1
+    WHERE id = OLD.game_id; -- OLD refers to the deleted row
+
     -- If game hasn't started then only decrease the count
     IF v_game.status != 'in_progress' THEN
         RETURN OLD;
+    END IF;
+
+    -- ── GAME IN PROGRESS ───────────────────────────────────────────────────────────────
+
+    -- detract points from the leaving player's elo if he's not eliminated already
+    IF (OLD.user_id = ANY(v_game.turn_order)) THEN
+        UPDATE players
+        SET elo = elo - 20
+        WHERE id = OLD.user_id;
     END IF;
 
     -- Retrieve 0-based index of the deleted player
@@ -39,12 +47,12 @@ BEGIN
     FROM unnest(v_game.turn_order) WITH ORDINALITY AS t(pid, i)
     WHERE pid = OLD.user_id;
 
-    -- Edge case in which player was not in turn_order
+    -- player was not in turn_order (has been eliminated)
     IF v_removed_player_position IS NULL THEN
         RETURN OLD;
     END IF;
 
-      -- Build the new turn_order array with the leaving player removed (keeps order)
+    -- Build the new turn_order array with the leaving player removed (keeps order)
     SELECT ARRAY(
         SELECT pid
         FROM unnest(v_game.turn_order) AS t(pid)
@@ -78,14 +86,46 @@ BEGIN
         v_new_turn_index := 0;
     END IF;
 
+    -- restart the voting phase in case it was active
+    IF v_game.phase = 'voting' THEN
+        -- wipe all votes for this round
+        UPDATE game_rounds SET
+            target_player_id = NULL,
+            voted = FALSE
+        WHERE game_id = OLD.game_id
+        AND round_number = v_game.round_number;
+
+        -- delete all entries of the leaving player
+        DELETE FROM game_rounds
+        WHERE game_id = OLD.game_id
+        AND player_id = OLD.user_id;
+    END IF;
+
     -- Update the game with the new turn order, corrected index,
     -- and the new active player derived from the updated array.
     -- Postgres arrays are 1-based, so add 1 to the 0-based index.
+    -- update phase_deadline if the game is in the voting phase or if the leaving
+    -- player is the active one, resetting the timer for the next player
     UPDATE ranked_games SET
         turn_order       = v_new_players_array,
         turn_index       = v_new_turn_index,
-        active_player_id = v_new_players_array[v_new_turn_index + 1]
+        active_player_id = v_new_players_array[v_new_turn_index + 1],
+        phase_deadline = CASE
+                            WHEN v_game.phase = 'voting'
+                            THEN now() + interval '60 seconds'
+
+                            WHEN (
+                                v_game.phase = 'word_input' AND
+                                v_game.active_player_id = OLD.user_id
+                            )
+                            THEN now() + interval '15 seconds'
+
+                            ELSE phase_deadline
+                         END
     WHERE ranked_games.id = OLD.game_id;
+
+    -- check if the game should end
+    PERFORM check_game_end(OLD.game_id);
 
     RETURN OLD;
 END;
