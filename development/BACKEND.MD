@@ -2,6 +2,9 @@
 - Implement profile deletion (reflected in database)
 - Set up SMTP provider to send profile confirmation emails
 - Fix theme flickering on page loads when db theme differs from preferred browser theme
+- Fix client elimination workarounds (voting/input from deleted players etc...)
+
+
 
 ### DONE
 - Home page check for valid session/cookies
