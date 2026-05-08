@@ -1,12 +1,8 @@
--- Schema dump from Supabase (public schema only)
--- Regenerate with:
--- pg_dump "postgresql://postgres.[PROJECT ID]:[DATABASE PASSWORD]@aws-1-eu-central-1.pooler.supabase.com:5432/postgres"
--- --schema-only --schema=public --no-owner --no-privileges --file supabase/schema.sql
 --
 -- PostgreSQL database dump
 --
 
-\restrict V7H4AsLtzYYHh92OiR2p395SQ1z302BV7GSzDtH3508aU6sJBpykgbTdORNlFlP
+\restrict X6a24Ccb9U75KueI3Q0P1zPimXVGZDGLBIKcd1BwV9W3irXfDsnWRk1c4We7zpn
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg24.04+1)
@@ -427,6 +423,21 @@ BEGIN
     AND status != 'finished'
     AND phase_deadline < now();
 END;
+$$;
+
+
+--
+-- Name: get_player_rank(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.get_player_rank(p_user_id uuid) RETURNS integer
+    LANGUAGE sql STABLE
+    AS $$
+    SELECT rank::integer FROM (
+        SELECT id, RANK() OVER (ORDER BY elo DESC) AS rank
+        FROM players
+    ) ranked
+    WHERE id = p_user_id;
 $$;
 
 
@@ -1180,5 +1191,5 @@ ALTER TABLE ONLY public.settings
 -- PostgreSQL database dump complete
 --
 
-\unrestrict V7H4AsLtzYYHh92OiR2p395SQ1z302BV7GSzDtH3508aU6sJBpykgbTdORNlFlP
+\unrestrict X6a24Ccb9U75KueI3Q0P1zPimXVGZDGLBIKcd1BwV9W3irXfDsnWRk1c4We7zpn
 
