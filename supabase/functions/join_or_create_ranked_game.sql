@@ -81,7 +81,6 @@ BEGIN
         SET role = CASE ranked.row_num
             WHEN 1 THEN 'spy'
             WHEN 2 THEN 'imposter'
-            WHEN 3 THEN 'imposter'
             ELSE        'civilian'
         END
         FROM (
