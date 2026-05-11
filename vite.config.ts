@@ -7,8 +7,11 @@ import Icons from 'unplugin-icons/vite';
 export default defineConfig({
 	plugins: [
 		sveltekit(),
+		
 		Icons({
 			compiler: 'svelte'
-		})
+		}),
+		
+		functionsMixins({ deps: ['m3-svelte'] } )
 	]
 });

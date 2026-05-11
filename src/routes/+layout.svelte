@@ -1,7 +1,5 @@
 <script lang='ts'>
   // ── Imports ──────────────────────────────────────────────────────────────────────────
-  import '/node_modules/m3-svelte/package/etc/recommended-styles.css';
-
   import '$lib/theme/light.css';
   import '$lib/theme/dark.css';
   import '$lib/theme/dark-hc.css';

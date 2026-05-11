@@ -12,7 +12,7 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
 	},
 	"devDependencies": {
-		"@fontsource-variable/google-sans-flex": "^5.2.1",
+		"@fontsource-variable/google-sans-flex": "^5.2.3",
 		"@iconify/json": "^2.2.458",
 		"@ktibow/iconset-material-symbols": "^0.0.1764827375",
 		"@sveltejs/adapter-auto": "^7.0.0",
