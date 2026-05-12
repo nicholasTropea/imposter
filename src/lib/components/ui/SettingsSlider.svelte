@@ -1,18 +1,34 @@
 <script lang='ts'>
     import { Slider } from 'm3-svelte';
 
-    let { label, initial = $bindable() }: { label: string, initial: number } = $props();
+    let {
+        label,
+        initial = $bindable(),
+        minimum = 0,
+        maximum = 100
+    }: {
+        label: string,
+        initial: number,
+        minimum?: number,
+        maximum?: number
+    } = $props();
 </script>
 
 
 <!-- HTML -->
 <div class = 'wrapper'>
     <div class = 'header'>
-        <span>{label}</span>
-        <span>{initial}</span>
+        <span>{ label }</span>
+        <span>{ initial }</span>
     </div>
 
-    <Slider bind:value={initial} endStops={false} min={0} max={100} step={1}/>
+    <Slider
+        bind:value = { initial }
+        endStops = { false }
+        min = { minimum }
+        max = { maximum }
+        step = { 1 }
+    />
 </div>
 
 

@@ -17,12 +17,7 @@
         { label: 'HOME', icon: HomeIcon, active: true },
         { label: 'LEADERBOARD', icon: PodiumIcon, handleClick: (() => goto('/leaderboard')) },
         { label: 'SETTINGS', icon: SettingsIcon, handleClick: (() => goto('/settings')) }
-    ]; 
-
-    // ── Navigation ─────────────────────────────────────────────────────────────────────
-    function handleRankedClick(): void {
-        goto('/loading_lobby');
-    }
+    ];
 </script>
 
 
@@ -31,14 +26,13 @@
     <main>
         <span>User: {data.userNickname}</span>
 
-        <Button variant = 'filled' onclick = {handleRankedClick} >
+        <Button variant = 'filled' onclick = { () => goto('/loading_lobby') } >
             Play Ranked Game
         </Button>
 
-        <div class = 'auxButtons'>
-            <Button> Create Game </Button>
-            <Button> Join Game </Button>
-        </div>
+        <Button variant = 'filled' onclick = { () => goto('/local_game/settings') } >
+            Play Local Game
+        </Button>
     </main>
 
     <NavBar items = {navItems} />
@@ -64,14 +58,5 @@
         align-items: center;
         justify-content: center;
         gap: 10vh;
-    }
-
-    .auxButtons {
-        width: 100%;
-
-        display: flex;
-        flex-direction: row;
-        justify-content: space-around;
-        align-items: center;
     }
 </style>
