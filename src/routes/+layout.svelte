@@ -10,6 +10,7 @@
   import '../app.css'; // This applies the styles to the entire app
   import { browser } from '$app/environment'
   import { themeStore } from '$lib/stores/theme.svelte.js';
+  import { onMount } from 'svelte';
 
   // ── Props ────────────────────────────────────────────────────────────────────────────
   const { data, children } = $props();
@@ -49,6 +50,15 @@
     document.documentElement.classList.remove(...all);
     document.documentElement.classList.add(classMap[`${themeStore.dark}-${contrast}`]);
   });
+
+  // ── Service Worker ───────────────────────────────────────────────────────────────────
+  onMount(async () => {
+    if ('serviceWorker' in  navigator) {
+      const { registerSW } = await import('virtual:pwa-register');
+      registerSW({ immediate: true });
+    }
+  });
+
 </script>
 
 {@render children()}

@@ -1,4 +1,5 @@
-/// <reference types="unplugin-icons/types/svelte" />
+/// <reference types = 'vite-plugin-pwa/client' /> 
+/// <reference types = 'unplugin-icons/types/svelte' />
 
 import type { SupabaseClient, Session, User } from "@supabase/supabase-js";
 import type { Database } from '$lib/types/supabase';

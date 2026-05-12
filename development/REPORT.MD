@@ -173,7 +173,7 @@ The page displays a Victory or Defeat label, the winning faction, the player's r
 
 ## Local Game Mode
 
-The local game mode allows players to start a game, entirely offline, passing a single device around. It is accessible from the home page and lives under the `/local_game` route. SSR is disabled for the entire route via `local_game/+layout.ts` (`ssr = false`) because all data is sourced client-side from `localStorage` and the Cache API.
+The local game mode allows players to start a game locally, including offline, by passing a single device around. It is accessible from the home page and lives under the `/local_game` route. SSR is disabled for the entire route via `local_game/+layout.ts` (`ssr = false`) because all data is sourced client-side from `localStorage` and the Cache API.
 
 ### Player Setup
 
@@ -192,6 +192,16 @@ The load function for the play page (`/local_game/play/+page.ts`) resolves a wor
 Role assignment, the game loop, voting, elimination, and win condition checks all run entirely client-side in `local_game/play/+page.svelte` with no database involvement. The number of spies, imposters, and civilians scales with player count. A UUID generated via `crypto.randomUUID()` is used as a sentinel value for the skip vote option, avoiding any string collision with player nicknames.
 
 When the game ends, the host can choose to play again — which navigates back to `/local_game/settings` so players can also adjust the roster — or return to home, which clears the `local_players` key from `localStorage`.
+
+## Progressive Web App Setup
+
+The application is configured as a Progressive Web App (PWA) using `vite-plugin-pwa`. The plugin generates the web app manifest and service worker during the production build, enabling installability and offline asset caching.
+
+The manifest defines the app name, short name, display mode (`standalone`), start URL, theme colors, and the required icons (`192x192` and `512x512`, with the larger icon also marked as `maskable`). In `app.html`, `theme-color` meta tags are provided separately for light and dark `prefers-color-scheme` values so the browser chrome better matches the active system theme.
+
+The service worker is registered client-side from `routes/+layout.svelte` using the `virtual:pwa-register` helper. Static build assets are precached automatically through Workbox's generated service worker, allowing the application shell to load even when the network is unavailable.
+
+At this stage, the PWA setup covers installability and offline caching of static assets. Route-level differentiation between browser visitors and installed-app launches is planned separately and is not yet part of this checkpoint.
 
 ## Type System
 

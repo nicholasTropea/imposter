@@ -3,8 +3,25 @@
 	<head>
 		<meta charset = 'utf-8' />
 		<meta name = 'viewport' content = 'width=device-width, initial-scale=1' />
+
+		<!-- PWA theme color ovverrides -->
+		<meta
+			name = 'theme-color'
+			content = '#171309'
+			media = '(prefers-color-scheme: dark)'
+		/>
+
+		<meta
+			name = 'theme-color'
+			content = '#735c00'
+			media = '(prefers-color-scheme: light)'
+		/>
+		
 		<link rel = 'icon' href = '%sveltekit.assets%/favicon.ico' />
+		<link rel = 'manifest' href = '/manifest.webmanifest'>
+		
 		%sveltekit.head%
+		
 		<script>
 			(function() {
 				const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
