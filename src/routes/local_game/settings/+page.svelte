@@ -1,6 +1,6 @@
 <script lang='ts'>
     // ── Imports ────────────────────────────────────────────────────────────────────────
-    import { Card, TextField, Button, snackbar, Snackbar } from 'm3-svelte';
+    import { Card, TextField, Button, snackbar } from 'm3-svelte';
     import CloseIcon from '~icons/mdi/close';
     import { goto } from '$app/navigation';
     import { browser } from '$app/environment';
@@ -92,8 +92,6 @@
         </Button>
     </div>
 </div>
-
-<Snackbar />
 
 
 <style>
