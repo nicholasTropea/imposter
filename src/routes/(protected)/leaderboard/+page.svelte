@@ -7,6 +7,7 @@
     import SettingsIcon from '~icons/mdi/gear';
 
     import { untrack } from 'svelte';
+    import { gotoIfOnline } from '$lib/utils/onlineGuard';
     import { goto } from '$app/navigation';
 
     import type { PageData } from './$types';
@@ -16,9 +17,21 @@
 
     // ── Navbar ─────────────────────────────────────────────────────────────────────────    
     const navItems = [
-        { label: 'HOME', icon: HomeIcon, handleClick: (() => goto('/home')) },
-        { label: 'LEADERBOARD', icon: PodiumIcon, active: true },
-        { label: 'SETTINGS', icon: SettingsIcon, handleClick: (() => goto('/settings')) }
+        {
+            label: 'HOME',
+            icon: HomeIcon,
+            handleClick: () => goto('/home')
+        },
+        {
+            label: 'LEADERBOARD',
+            icon: PodiumIcon,
+            active: true
+        },
+        {
+            label: 'SETTINGS',
+            icon: SettingsIcon,
+            handleClick: () => gotoIfOnline('/settings')
+        }
     ];
 
     // ── Other ──────────────────────────────────────────────────────────────────────────
@@ -83,7 +96,7 @@
         </div>
     </main>
 
-    <NavBar items = {navItems} />
+    <NavBar items = { navItems } />
 </div>
 
 
