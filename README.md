@@ -4,7 +4,7 @@
 
 Imposter Words is a real-time social deduction word game built as a web application. Players can create an account, join ranked online matches, wait in a multiplayer lobby, play through a phase-based game loop, and view the final result with Elo updates.
 
-The project also includes a local game mode that runs entirely client-side and remains playable offline by passing a single device between players. The application is installable as a Progressive Web App (PWA) and supports offline loading of the application shell and static assets.[web:460][web:451]
+The project also includes a local game mode that runs entirely client-side and remains playable offline by passing a single device between players. The application is installable as a Progressive Web App (PWA), supports offline loading of the application shell and static assets, and now includes shared connectivity utilities for detecting and guarding online-only actions.[web:497][web:496]
 
 ## Tech Stack
 
@@ -20,7 +20,9 @@ The application uses the following stack:
 - **PWA tooling:** `@vite-pwa/sveltekit`
 - **Package manager:** npm
 
-SvelteKit handles routing, layouts, server `load` functions, form actions, and client-side navigation. Supabase provides authentication, PostgreSQL storage, Row Level Security, Realtime subscriptions, and RPC-backed game logic.[web:460][cite:448]
+SvelteKit handles routing, layouts, server `load` functions, form actions, and client-side navigation. Supabase provides authentication, PostgreSQL storage, Row Level Security, Realtime subscriptions, and RPC-backed game logic.
+
+The frontend also includes a shared connectivity layer composed of `lib/stores/network.ts`, `lib/utils/checkConnection.ts`, and `lib/utils/onlineGuard.ts`. These files provide global offline state, real network verification, and reusable guards for online-only navigation and form submission.[web:496][web:497]
 
 ## Authentication
 
@@ -200,19 +202,13 @@ When the local game ends, players can either return to `/local_game/settings` to
 
 ## Progressive Web App Setup
 
-The application is configured as a Progressive Web App (PWA) using `@vite-pwa/sveltekit`, which integrates manifest generation and service worker support with SvelteKit.[web:460][web:465]
+The application is configured as a Progressive Web App (PWA) using `@vite-pwa/sveltekit`, which integrates manifest generation and service worker support with SvelteKit.[web:497]
 
-The manifest defines the app name, short name, display mode (`standalone`), start URL, theme colors, and required icons. The application launches from `/`, and `app.html` includes separate `theme-color` meta tags for light and dark `prefers-color-scheme` values so the browser chrome matches the active theme.[web:460]
+The manifest defines the app name, short name, display mode (`standalone`), start URL, theme colors, and required icons. The application launches from `/`, and the app shell is designed to load even when the network is unavailable because static assets are precached for offline use.[web:497]
 
-The service worker is registered client-side from `routes/+layout.svelte` using `virtual:pwa-register`. Workbox precaches the main static asset types using:
+The service worker is registered client-side from `routes/+layout.svelte` using `virtual:pwa-register`. Static assets are precached, and navigation fallback is configured so the application shell can still load when a route request cannot be fulfilled from the network.[web:497]
 
-```ts
-globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}']
-```
-
-Navigation requests use `navigateFallback: '/'`, allowing the application shell to load when a route is unavailable directly from the network.[web:451][web:460]
-
-This setup provides installability, offline application-shell loading, and static asset precaching. Online-only actions and protected data access are handled separately in application logic.[web:456][web:451]
+In addition to service-worker-based offline loading, the app includes a global connectivity utility. `isEffectivelyOffline()` performs a real network probe instead of trusting `navigator.onLine` alone, `offline` exposes a shared store with polling and browser online/offline listeners, and `onlineGuard` provides reusable helpers for protecting navigation and form submissions that require a live connection.[web:496][web:497]
 
 ## Type System
 
