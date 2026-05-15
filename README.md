@@ -4,7 +4,9 @@
 
 Imposter Words is a real-time social deduction word game built as a web application. Players can create an account, join ranked online matches, wait in a multiplayer lobby, play through a phase-based game loop, and view the final result with Elo updates.
 
-The project also includes a local game mode that runs entirely client-side and remains playable offline by passing a single device between players. The application is installable as a Progressive Web App (PWA), supports offline loading of the application shell and static assets, and now includes shared connectivity utilities for detecting and guarding online-only actions.[web:497][web:496]
+The project also includes a local game mode that runs entirely client-side and remains playable offline by passing a single device between players. The application is installable as a Progressive Web App (PWA), supports offline loading of the application shell and static assets, and uses shared connectivity utilities to detect and guard online-only actions.
+
+The routing structure now separates offline-capable shell routes from authenticated server-backed areas. The root route `/` is configured as a client-only prerendered entry page, `/home` is intentionally accessible offline, and only actions or pages that truly require live backend access remain protected through the `(protected)` route group.[1][2]
 
 ## Tech Stack
 
@@ -22,15 +24,15 @@ The application uses the following stack:
 
 SvelteKit handles routing, layouts, server `load` functions, form actions, and client-side navigation. Supabase provides authentication, PostgreSQL storage, Row Level Security, Realtime subscriptions, and RPC-backed game logic.
 
-The frontend also includes a shared connectivity layer composed of `lib/stores/network.ts`, `lib/utils/checkConnection.ts`, and `lib/utils/onlineGuard.ts`. These files provide global offline state, real network verification, and reusable guards for online-only navigation and form submission.[web:496][web:497]
+The frontend also includes a shared connectivity layer composed of `lib/stores/network.ts`, `lib/utils/checkConnection.ts`, and `lib/utils/onlineGuard.ts`. These files provide global offline state, real network verification, and reusable guards for online-only navigation and form submissions.
 
 ## Authentication
 
-Users register an account and confirm their email address if email confirmation is enabled in the Supabase project settings. Unauthenticated users can access only public routes, while protected routes are guarded server-side and redirect unauthenticated visitors to the login page.
+Users register an account and confirm their email address if email confirmation is enabled in the Supabase project settings. Upon successful registration, a database trigger named `handle_new_user` inserts one row into the `players` table and one row into the `settings` table, with the initial Elo set to 1000.
 
-Upon successful registration, a database trigger named `handle_new_user` automatically inserts one row into the `players` table and one row into the `settings` table. The `players` row stores public profile information such as nickname and Elo-related counters, and the initial Elo is set to 1000.
+Authentication is now split between client-side state and server-protected route groups. Client-side auth state is initialized through `lib/stores/auth.ts` for reactive UI and navigation decisions, while authenticated server-backed sections remain guarded through the `(protected)` route group rather than through global layout-level server loading.[1]
 
-After login, Supabase issues an active session through HTTP-only cookies. SvelteKit server hooks read these cookies on each request to determine authentication state and protect guarded server `load` functions and actions.
+This means `/home` is no longer treated as a fully protected server route. Instead, it remains available offline as part of the application shell, while operations that require a live Supabase session are guarded individually through online-gated navigation, form handlers, and protected server routes where appropriate.[1][2]
 
 ## Settings
 
@@ -42,9 +44,11 @@ This approach allows users to adjust multiple controls quickly without generatin
 
 ## Theme
 
-The active theme is applied from `routes/+layout.svelte` through a Svelte `$effect` rune that reads from `themeStore` in `lib/stores/theme.svelte.ts`.
+Theme state is managed through `lib/stores/theme.svelte.ts`, which keeps a shared in-memory `dark` value for the running app and lazily initializes it in the browser. The store resolves its initial value from `localStorage` when available, otherwise from `prefers-color-scheme`, and persists subsequent user changes back to `localStorage`.
 
-For authenticated users, the theme value stored in the `settings` table is loaded server-side and applied to the app. For unauthenticated users, the browser's `prefers-color-scheme` preference is used. During registration, the detected browser preference is stored as the initial theme value in the user's `settings` row.
+The root `routes/+layout.svelte` no longer depends on `routes/+layout.server.ts`. Instead, it initializes shared client-side concerns such as auth state, theme state, the global snackbar, and the global offline status pill, allowing the public shell to start correctly without server-provided layout data.[1]
+
+For authenticated sections, database-backed theme preferences are still loaded server-side in `(protected)/+layout.server.ts` and then applied in `(protected)/+layout.svelte`. This allows persisted settings from the `settings` table to override the browser-derived default when the user is inside protected server-backed areas.[1]
 
 ## Ranked Matchmaking
 
@@ -202,13 +206,15 @@ When the local game ends, players can either return to `/local_game/settings` to
 
 ## Progressive Web App Setup
 
-The application is configured as a Progressive Web App (PWA) using `@vite-pwa/sveltekit`, which integrates manifest generation and service worker support with SvelteKit.[web:497]
+The application is configured as a Progressive Web App (PWA) using `@vite-pwa/sveltekit`, which integrates manifest generation and service worker support with SvelteKit.
 
-The manifest defines the app name, short name, display mode (`standalone`), start URL, theme colors, and required icons. The application launches from `/`, and the app shell is designed to load even when the network is unavailable because static assets are precached for offline use.[web:497]
+The manifest defines the app name, short name, display mode (`standalone`), start URL, theme colors, and required icons. The application launches from `/`, and the app shell is designed to load even when the network is unavailable because static assets are precached for offline use.
 
-The service worker is registered client-side from `routes/+layout.svelte` using `virtual:pwa-register`. Static assets are precached, and navigation fallback is configured so the application shell can still load when a route request cannot be fulfilled from the network.[web:497]
+The service worker is registered client-side from `routes/+layout.svelte` using `virtual:pwa-register`. Static assets are precached, and navigation fallback is configured so the application shell can still load when a route request cannot be fulfilled from the network.
 
-In addition to service-worker-based offline loading, the app includes a global connectivity utility. `isEffectivelyOffline()` performs a real network probe instead of trusting `navigator.onLine` alone, `offline` exposes a shared store with polling and browser online/offline listeners, and `onlineGuard` provides reusable helpers for protecting navigation and form submissions that require a live connection.[web:496][web:497]
+In addition to service-worker-based offline loading, the app includes a global connectivity utility. `isEffectivelyOffline()` performs a real network probe instead of trusting `navigator.onLine` alone, `offline` exposes a shared store with polling and browser online/offline listeners, and `onlineGuard` provides reusable helpers for protecting navigation and form submissions that require a live connection.
+
+The current routing design builds on that PWA setup by making both `/` and `/home` part of the offline-capable shell, while backend-dependent operations remain explicitly guarded. This makes the application more resilient under unstable connectivity without exposing server-backed actions indiscriminately.[1][2]
 
 ## Type System
 

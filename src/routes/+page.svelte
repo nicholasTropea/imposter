@@ -1,28 +1,62 @@
-<script lang="ts">
+<script lang='ts'>
+	import { Button } from 'm3-svelte';
+	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { auth } from '$lib/stores/auth';
 
-    import { Button } from 'm3-svelte';
-    import { goto } from '$app/navigation';
+	let installed = $state(false);
+	let mounted = $state(false);
 
-    async function handleHomeClick() { await goto('/home'); }
-    async function handleSignupClick() { await goto('/signup'); }
-    
-    let variant: "elevated" | "filled" | "tonal" | "outlined" | "text" = $state("filled");
-    let square = $state(false);
-    const sizes = ["xs", "s", "m", "l", "xl"] as const;
-    let sizeIndex = $state(1);
+	const loggedIn = $derived(!!$auth.user);
+
+	onMount(() => {
+		installed =
+			('standalone' in window.navigator &&
+				(window.navigator as Navigator & { standalone?: boolean }).standalone === true) ||
+			window.matchMedia('(display-mode: standalone)').matches;
+
+		mounted = true;
+	});
+
+	$effect(() => {
+		if (!mounted) return;
+
+		if (installed || loggedIn) {
+			goto('/home');
+		}
+	});
 </script>
 
-LANDING PAGE
 
-<Button
-    {variant}
-    {square}
-    size={sizes[sizeIndex]}
-    onclick={handleHomeClick}
->
-    go to home
-</Button>
+<!-- HTML -->
+<div class = 'wrapper'>
+	<h1> Imposter Words </h1>
+	<p> A social deduction word game. </p>
 
-<Button onclick={handleSignupClick} >
-    go to signup
-</Button>
+	<Button variant = 'filled' onclick = { () => goto('/signup') } >
+		Sign up
+	</Button>
+
+	<Button variant = 'outlined' onclick = { () => goto('/login') } >
+		Login
+	</Button>
+
+	<Button variant = 'text' onclick = { () => goto('/local_game/settings') } >
+		Play local
+	</Button>
+</div>
+
+
+<style>
+	.wrapper {
+		width: 100%;
+		height: 100%;
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		align-items: center;
+		gap: 1rem;
+		padding: 1rem;
+		text-align: center;
+	}
+</style>
