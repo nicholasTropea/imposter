@@ -33,7 +33,5 @@ export const actions: Actions = {
         });
         
         if (error) return fail(400, { error: error.message });
-
-        redirect(303, '/home');
     }
 }
