@@ -1,7 +1,7 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 import { functionsMixins } from "vite-plugin-functions-mixins";
-import { VitePWA } from 'vite-plugin-pwa';
+import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 
 import Icons from 'unplugin-icons/vite';
 
@@ -16,14 +16,14 @@ export default defineConfig({
 		functionsMixins({ deps: ['m3-svelte'] } ),
 
 		// PWA
-		VitePWA({
+		SvelteKitPWA({
 			registerType: 'autoUpdate',
 			injectRegister: 'auto',
 			manifest: {
 				name: 'Imposter Words',
 				short_name: 'Imposter',
 				description: 'A social deduction word game',
-				start_url: '/app',
+				start_url: '/',
 				display: 'standalone',
 				background_color: '#171309',
 				theme_color: '#ffe394',
@@ -43,20 +43,8 @@ export default defineConfig({
 				]
 			},
 			workbox: {
-				globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-				runtimeCaching: [
-					{
-                        urlPattern: /^https:\/\/.*\.supabase\.co\/rest/,
-                        handler: 'NetworkFirst',
-                        options: {
-                            cacheName: 'supabase-api',
-                            expiration: {
-                                maxEntries: 50,
-                                maxAgeSeconds: 60 * 60 * 24 // 24h
-                            }
-                        }
-					}
-				]
+				navigateFallback: '/',
+				globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}']
 			}
 		})
 	]

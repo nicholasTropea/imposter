@@ -18,6 +18,10 @@ const config = {
 
 		alias: {
 			$components: 'src/lib/components'
+		},
+
+		paths: {
+			relative: false
 		}
 	}
 };
