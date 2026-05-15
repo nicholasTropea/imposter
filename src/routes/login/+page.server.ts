@@ -22,7 +22,5 @@ export const actions: Actions = {
 
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) return fail(400, { error: error.message });
-
-        redirect(303, '/home');
     }
 };
