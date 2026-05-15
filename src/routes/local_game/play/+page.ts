@@ -2,6 +2,7 @@ import { fallbackWordPairs } from '$lib/data/wordPairs';
 import { redirect } from '@sveltejs/kit';
 import { browser } from '$app/environment';
 import { supabase } from '$lib/supabase';
+import { isEffectivelyOffline } from '$lib/utils/checkConnection';
 
 const CACHE_KEY = 'cached_word_pairs';
 const CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours
@@ -10,17 +11,20 @@ export async function load() {
     if (!browser) return {};
     
     const players: string[] = JSON.parse(localStorage.getItem('local_players') ?? '[]');
-    if (players.length < 4) redirect(302, '/local_game/settings');
+    if (players.length < 4) throw redirect(302, '/local_game/settings');
 
     const cached = localStorage.getItem(CACHE_KEY);
     const cachedAt = localStorage.getItem(CACHE_KEY + '_ts');
     const isValid = cached && cachedAt && (Date.now() - Number(cachedAt)) < CACHE_TTL;
 
+    const isOffline = await isEffectivelyOffline(); 
+
     let wordPairs = fallbackWordPairs;
 
-    // try cache, fallback to database, fallback to hardcoded
+    // try cache, fallback to database (if online), fallback to hardcoded
     if (isValid) wordPairs = JSON.parse(cached);
-    else {
+    // if online try fetching from database
+    else if (!isOffline) {
         try {
             const { data, error } = await supabase
                 .from('words')

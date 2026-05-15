@@ -2,7 +2,7 @@
     // ── Imports ────────────────────────────────────────────────────────────────────────
     import { untrack } from "svelte";
     import { Button } from "m3-svelte";
-    import { goto, invalidateAll } from "$app/navigation";
+    import { goto } from "$app/navigation";
 
     // ── Props ──────────────────────────────────────────────────────────────────────────
     let { data } = $props();
@@ -138,16 +138,15 @@
         return null;
     }
 
-    function handleHomeClick(): void {
+    async function handleHomeClick() {
         localStorage.removeItem('local_players');
-        goto('/home');
+        await goto('/home');
     }
 </script>
 
 
 <!-- HTML -->
 <div class = 'page'>
-
     {#if phase === 'role_show'}
         {@const activePlayer = players[playerIndex]}
 
@@ -310,7 +309,6 @@
             </div>
         </div>
     {/if}
-
 </div>
 
 
