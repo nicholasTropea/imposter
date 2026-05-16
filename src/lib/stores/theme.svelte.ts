@@ -1,138 +1,137 @@
-import { browser } from "$app/environment";
+import { browser } from '$app/environment';
 
-/*
- * Shared in-memory theme state for the current running app.
+type Contrast = 'standard' | 'medium' | 'high';
+
+/**
+ * Shared global theme state for the currently running app instance.
  *
- * Important:
- * - This variable starts as `true` by default.
- * - It is just a temporary default until the store initializes in the browser.
+ * This module acts as a small theme manager:
+ * - it stores the current dark/light mode
+ * - it stores the selected contrast level
+ * - it remembers whether the first browser initialization already happened
+ * - it applies the correct theme class to `document.documentElement`
  */
-let dark = $state(true);
+export const themeStore = $state({
+	dark: true,
+	initialized: false,
+	contrast: 'standard' as Contrast
+});
 
-/*
- * Says whether the first initialization has already been performed
- * from browser data (localStorage / system preference).
+/**
+ * Maps the current `(dark, contrast)` combination to the CSS class
+ * that should be present on the root `<html>` element.
  *
- * Makes it so that initialization happens only once.
+ * The imported theme CSS files define these classes globally.
  */
-let initialized = false;
+const classMap: Record<string, string> = {
+	'false-standard': 'light',
+	'true-standard': 'dark',
+	'false-medium': 'light-medium-contrast',
+	'true-medium': 'dark-medium-contrast',
+	'false-high': 'light-high-contrast',
+	'true-high': 'dark-high-contrast'
+};
 
-/*
- * Reads the "best" initial theme from the browser.
+/**
+ * Resolves the best initial dark/light mode from the browser.
  *
  * Priority:
- * 1. localStorage, if the user already chose a theme before
- * 2. system/browser preference (prefers-color-scheme)
- * 3. fallback to false/light
+ * 1. previously saved user choice from `localStorage`
+ * 2. system preference via `prefers-color-scheme`
+ * 3. fallback to dark mode when browser APIs are unavailable
  *
- * Why the `browser` check?
- * In SvelteKit, code can run on the server too, and server code does not
- * have access to `window` or `localStorage`.
+ * This function must be browser-guarded because `localStorage`
+ * and `window.matchMedia` do not exist during SSR.
+ *
+ * @returns `true` when dark mode should be used initially, otherwise `false`.
  */
 function getInitialTheme(): boolean {
-    if (!browser) return false;
+	if (!browser) return true;
 
-    /*
-	 * If the user previously chose a theme, it's stored in localStorage.
-	 * That value should win over system preference.
-	 */
-    const saved = localStorage.getItem('theme');
-    if (saved === 'dark') return true;
-    if (saved === 'light') return false;
+	const saved = localStorage.getItem('theme');
+	if (saved === 'dark') return true;
+	if (saved === 'light') return false;
 
-    /*
-	 * If nothing was saved yet, use the operating system / browser preference.
-	 */
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+	return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
-/*
- * Performs the first initialization of the store.
+/**
+ * Persists the user's dark/light preference in `localStorage`
+ * so it survives reloads and future visits.
  *
- * This is "lazy initialization":
- * the store is NOT fully initialized as soon as this file is imported.
- * Instead, it is initialized only the first time someone actually uses it.
- *
- * Doing it lazily:
- * - avoids touching browser-only APIs too early
- * - keeps the code safe in SvelteKit
- * - ensures initialization happens only when needed
+ * @param value - `true` for dark mode, `false` for light mode.
  */
-function ensureInitialized(): void {
-    /*
-	 * If it has been initialized, do nothing.
-	 * If not in the browser, also do nothing.
-	 */
-    if (initialized || !browser) return;
-
-    /* Initialize */
-    dark = getInitialTheme();
-
-    /*
-	 * Mark as initialized so this block never runs again in this app session.
-	 */
-    initialized = true;
+function persistTheme(value: boolean): void {
+	if (!browser) return;
+	localStorage.setItem('theme', value ? 'dark' : 'light');
 }
 
-/*
- * Saves the current theme choice in localStorage.
+/**
+ * Applies the currently selected theme class to the root `<html>` element.
  *
- * This makes the choice survive:
- * - refreshes
- * - closing and reopening the browser
- * - app restarts
+ * This function is the bridge between reactive state and global DOM styling.
+ * It first removes all known theme classes, then adds the single class that
+ * matches the current `themeStore.dark` and `themeStore.contrast` values.
+ *
+ * It is intentionally centralized here so that theme changes always follow
+ * the same code path, avoiding scattered DOM class manipulation in layouts
+ * or individual pages.
  */
-function persist(value: boolean): void {
-    if (!browser) return;
-    localStorage.setItem('theme', value ? 'dark' : 'light');
+function applyThemeClass(): void {
+	if (!browser) return;
+
+	const all = Object.values(classMap);
+	document.documentElement.classList.remove(...all);
+	document.documentElement.classList.add(
+		classMap[`${themeStore.dark}-${themeStore.contrast}`]
+	);
 }
 
-/*
- * The object the rest of the app imports and uses.
+/**
+ * Performs one-time browser initialization of the theme store.
  *
- * It exposes:
- * - init()      -> force initialization manually
- * - get dark()  -> read the current theme
- * - set dark()  -> update the theme
+ * Called once in routes/+layout.svelte.
+ * 
+ * On first run it:
+ * - resolves the initial dark/light mode from browser state
+ * - marks the store as initialized
+ * - applies the matching theme class to `<html>`
+ *
+ * Repeated calls are safe; after initialization they do nothing.
  */
-export const themeStore = {
-    /*
-	 * Optional manual initialization.
-	 *
-	 * Called once in the root layout, so the theme is resolved
-	 * as soon as the app starts in the browser.
-	 *
-	 * If init() has not been called, the getter will still initialize
-	 * automatically the first time `themeStore.dark` is read.
-	 */
-    init() {
-        ensureInitialized();
-    },
+export function initThemeStore(): void {
+	if (themeStore.initialized || !browser) return;
 
-    /*
-	 * Getter for the current theme.
-	 *
-	 * Important:
-	 * The FIRST time this getter is read in the browser, it automatically
-	 * triggers initialization if it has not happened yet.
-	 */
-    get dark() {
-        ensureInitialized();
-        return dark;
-    },
-    
-    /*
-	 * Setter for the current theme.
-	 *
-	 * When the user changes theme:
-	 * 1. update in-memory state immediately
-	 * 2. save it to localStorage
-	 *
-	 * This means the UI updates right away, and the preference is remembered
-	 * for future visits.
-	 */
-    set dark(v: boolean) {
-        dark = v;
-        persist(v);
-    }
-};
+	themeStore.dark = getInitialTheme();
+	themeStore.initialized = true;
+	applyThemeClass();
+}
+
+/**
+ * Updates the current dark/light mode, persists it locally,
+ * and immediately reapplies the root document theme class.
+ *
+ * This should be the main public entry point for user-triggered
+ * theme changes from settings pages, toggles, or startup sync.
+ *
+ * @param value - `true` for dark mode, `false` for light mode.
+ */
+export function setTheme(value: boolean): void {
+	themeStore.dark = value;
+	persistTheme(value);
+	applyThemeClass();
+}
+
+/**
+ * Updates the current contrast level and immediately reapplies
+ * the root document theme class.
+ *
+ * Contrast is kept separate from dark/light mode so the app can support
+ * combinations such as dark-high-contrast or light-medium-contrast.
+ *
+ * @param value - The new contrast mode to apply.
+ */
+export function setContrast(value: Contrast): void {
+	themeStore.contrast = value;
+	applyThemeClass();
+}

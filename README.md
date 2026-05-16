@@ -6,7 +6,7 @@ Imposter Words is a real-time social deduction word game built as a web applicat
 
 The project also includes a local game mode that runs entirely client-side and remains playable offline by passing a single device between players. The application is installable as a Progressive Web App (PWA), supports offline loading of the application shell and static assets, and uses shared connectivity utilities to detect and guard online-only actions.
 
-The routing structure now separates offline-capable shell routes from authenticated server-backed areas. The root route `/` is configured as a client-only prerendered entry page, `/home` is intentionally accessible offline, and only actions or pages that truly require live backend access remain protected through the `(protected)` route group.[1][2]
+The routing structure now separates offline-capable shell routes from authenticated server-backed areas. The root route `/` is configured as a client-only prerendered entry page, `/home` is intentionally accessible offline, and only actions or pages that truly require live backend access remain protected through the `(protected)` route group.
 
 ## Tech Stack
 
@@ -30,9 +30,9 @@ The frontend also includes a shared connectivity layer composed of `lib/stores/n
 
 Users register an account and confirm their email address if email confirmation is enabled in the Supabase project settings. Upon successful registration, a database trigger named `handle_new_user` inserts one row into the `players` table and one row into the `settings` table, with the initial Elo set to 1000.
 
-Authentication is now split between client-side state and server-protected route groups. Client-side auth state is initialized through `lib/stores/auth.ts` for reactive UI and navigation decisions, while authenticated server-backed sections remain guarded through the `(protected)` route group rather than through global layout-level server loading.[1]
+Authentication is split between client-side state and server-protected route groups. Client-side auth state is initialized through `lib/stores/auth.ts` for reactive UI and navigation decisions, while authenticated server-backed sections remain guarded through the `(protected)` route group rather than through global layout-level server loading.
 
-This means `/home` is no longer treated as a fully protected server route. Instead, it remains available offline as part of the application shell, while operations that require a live Supabase session are guarded individually through online-gated navigation, form handlers, and protected server routes where appropriate.[1][2]
+This means `/home` is no longer treated as a fully protected server route. Instead, it remains available offline as part of the application shell, while operations that require a live Supabase session are guarded individually through online-gated navigation, form handlers, and protected server routes where appropriate.
 
 ## Settings
 
@@ -40,15 +40,19 @@ The settings page persists changes automatically through a debounced autosave me
 
 Each change to a field starts an 800ms timer. If the user changes another control before the timer expires, the timer resets. Once the timer completes without interruption, all accumulated changes are written to the `settings` table in a single database call.
 
-This approach allows users to adjust multiple controls quickly without generating one network request per interaction.
+When the page is already open and the client goes offline, settings changes are still kept locally in `localStorage`. Pending changes are retried automatically when connectivity returns, allowing the protected page to remain usable after load even though entering it still requires an authenticated online server request.
 
 ## Theme
 
-Theme state is managed through `lib/stores/theme.svelte.ts`, which keeps a shared in-memory `dark` value for the running app and lazily initializes it in the browser. The store resolves its initial value from `localStorage` when available, otherwise from `prefers-color-scheme`, and persists subsequent user changes back to `localStorage`.
+Theme state is now managed through `lib/stores/theme.svelte.ts` as a shared Svelte 5 rune-based module. The store tracks `dark`, `contrast`, and `initialized` state, resolves the initial theme from `localStorage` or `prefers-color-scheme`, and persists user-selected light or dark mode back to `localStorage`.
 
-The root `routes/+layout.svelte` no longer depends on `routes/+layout.server.ts`. Instead, it initializes shared client-side concerns such as auth state, theme state, the global snackbar, and the global offline status pill, allowing the public shell to start correctly without server-provided layout data.[1]
+The theme module also acts as the single global theme manager for the app. Instead of relying on a layout-level reactive effect to notice theme changes and toggle document classes, the store applies the correct CSS class directly to `document.documentElement` whenever the theme or contrast changes.
 
-For authenticated sections, database-backed theme preferences are still loaded server-side in `(protected)/+layout.server.ts` and then applied in `(protected)/+layout.svelte`. This allows persisted settings from the `settings` table to override the browser-derived default when the user is inside protected server-backed areas.[1]
+This moved the global DOM side effect into the same module that owns theme state. In practice, this made theme switching more reliable because theme changes now follow one explicit path: update shared state, persist the preference, and immediately apply the root document class.
+
+The root `routes/+layout.svelte` has therefore been simplified. It still imports the theme stylesheets, initializes the shared theme store on startup, registers the service worker, initializes the client auth store, and renders the global offline pill and snackbar, but it no longer needs a dedicated reactive effect just to synchronize document theme classes.
+
+For authenticated sections, database-backed theme preferences can still be loaded from the `settings` table and then pushed into the shared theme manager when needed. This allows persisted account settings to override browser-derived defaults while keeping one centralized implementation for live theme application.
 
 ## Ranked Matchmaking
 
@@ -214,7 +218,7 @@ The service worker is registered client-side from `routes/+layout.svelte` using 
 
 In addition to service-worker-based offline loading, the app includes a global connectivity utility. `isEffectivelyOffline()` performs a real network probe instead of trusting `navigator.onLine` alone, `offline` exposes a shared store with polling and browser online/offline listeners, and `onlineGuard` provides reusable helpers for protecting navigation and form submissions that require a live connection.
 
-The current routing design builds on that PWA setup by making both `/` and `/home` part of the offline-capable shell, while backend-dependent operations remain explicitly guarded. This makes the application more resilient under unstable connectivity without exposing server-backed actions indiscriminately.[1][2]
+The current routing design builds on that PWA setup by making both `/` and `/home` part of the offline-capable shell, while backend-dependent operations remain explicitly guarded. This makes the application more resilient under unstable connectivity without exposing server-backed actions indiscriminately.
 
 ## Type System
 
