@@ -1,4 +1,4 @@
-import { redirect } from '@sveltejs/kit';
+import { redirect, error as svelteError } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
 /**
@@ -18,13 +18,13 @@ import type { PageServerLoad } from './$types';
  */
 export const load: PageServerLoad = async ({ locals, parent }) => {
     const { userId } = await parent();
-    if (!userId) redirect(303, '/login');
+    if (!userId) throw redirect(303, '/login');
 
     const { data: gameId, error } = await locals.supabase
         .rpc('join_or_create_ranked_game', { p_user_id: userId });
 
-    if (error) throw error;
+    if (error || !gameId) throw svelteError(500, 'Could not start matchmaking.'); 
 
     // Game found/created
-    redirect(303, `/game_lobby/${gameId}`);
+    throw redirect(303, `/game_lobby/${gameId}`);
 }
