@@ -2,6 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import type { Actions } from '@sveltejs/kit';
 
+type Theme = 'light' | 'dark';
 
 /**
  * Page load function for the settings route.
@@ -17,18 +18,19 @@ import type { Actions } from '@sveltejs/kit';
  * @throws {redirect} 303 to `/login` if the session is invalid or expired.
  */
 export const load: PageServerLoad = async ({ locals: { supabase }, parent }) => {
-    const { userId } = await parent();
-    if (!userId) redirect(303, '/login');
+	const { userId } = await parent();
 
-    const { data: settings } = await supabase
-        .from('settings')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
+	if (!userId) throw redirect(303, '/login');
 
-    if (!settings) redirect(303, '/home'); // Should never happen but satisfies TS
+	const { data: settings, error } = await supabase
+		.from('settings')
+		.select('*')
+		.eq('user_id', userId)
+		.single();
 
-    return { settings };
+	if (error || !settings) throw redirect(303, '/home');
+
+	return { settings };
 };
 
 
@@ -53,20 +55,49 @@ export const actions: Actions = {
      *
      * @returns {fail(401)} If the session is missing or invalid.
      */
-    saveSettings: async ({ request, locals: { supabase, safeGetSession } }) => {
-        const { user } = await safeGetSession();
-        if (!user) return fail(401);
+	saveSettings: async ({ request, locals: { supabase, safeGetSession } }) => {
+		const { user } = await safeGetSession();
+		if (!user) return fail(401, { error: 'Unauthorized' });
 
-        const form = await request.formData();
+		const form = await request.formData();
 
-        await supabase.from('settings').upsert({
-            user_id:       user.id,
-            theme:         form.get('theme') as 'dark' | 'light',
-            master_volume: Number(form.get('master_volume')),
-            music_volume:  Number(form.get('music_volume')),
-            sound_effects: form.get('sound_effects') === 'true',
-            game_invites:  form.get('game_invites')  === 'true',
-            daily_rewards: form.get('daily_rewards') === 'true',
-        });
-    }
+		const rawTheme = form.get('theme');
+		const masterVolume = Number(form.get('master_volume'));
+		const musicVolume = Number(form.get('music_volume'));
+		const soundEffects = form.get('sound_effects') === 'true';
+		const gameInvites = form.get('game_invites') === 'true';
+		const dailyRewards = form.get('daily_rewards') === 'true';
+
+		if (rawTheme !== 'dark' && rawTheme !== 'light') {
+			return fail(400, { error: 'Invalid theme value' });
+		}
+
+		const theme: Theme = rawTheme;
+
+		if (!Number.isFinite(masterVolume) || masterVolume < 0 || masterVolume > 100) {
+			return fail(400, { error: 'Invalid master volume' });
+		}
+
+		if (!Number.isFinite(musicVolume) || musicVolume < 0 || musicVolume > 100) {
+			return fail(400, { error: 'Invalid music volume' });
+		}
+
+		const payload = {
+			user_id: user.id,
+			theme,
+			master_volume: masterVolume,
+			music_volume: musicVolume,
+			sound_effects: soundEffects,
+			game_invites: gameInvites,
+			daily_rewards: dailyRewards
+		};
+
+		const { error } = await supabase.from('settings').upsert(payload);
+
+		if (error) {
+			return fail(500, { error: 'Could not save settings' });
+		}
+
+		return { success: true };
+	}
 };

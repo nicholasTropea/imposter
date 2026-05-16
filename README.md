@@ -38,9 +38,13 @@ This means `/home` is no longer treated as a fully protected server route. Inste
 
 The settings page persists changes automatically through a debounced autosave mechanism. The page does not use an explicit save button.
 
-Each change to a field starts an 800ms timer. If the user changes another control before the timer expires, the timer resets. Once the timer completes without interruption, all accumulated changes are written to the `settings` table in a single database call.
+Each change updates a full in-memory settings snapshot and starts an 800ms timer. If the user changes another control before the timer expires, the timer resets. Once the timer completes without interruption, the latest snapshot is sent to the `saveSettings` server action in a single request.
 
-When the page is already open and the client goes offline, settings changes are still kept locally in `localStorage`. Pending changes are retried automatically when connectivity returns, allowing the protected page to remain usable after load even though entering it still requires an authenticated online server request.
+The page now uses two localStorage-backed layers to support offline editing after the protected route has already loaded. A `settings_local_draft` entry stores the latest full local snapshot so the UI can survive refreshes, while a separate `settings_pending_sync` entry stores the latest version that still needs to be written to the backend.
+
+When the client is offline, settings changes are still applied locally, persisted to localStorage, and marked for later synchronization instead of being discarded. When connectivity returns, the page automatically retries the pending payload and clears the pending-sync entry after a successful save.
+
+This allows the settings page to remain usable after load even though entering it still requires an authenticated online server request. In practice, the page behaves like an offline-capable editor layered on top of a protected server-backed route.
 
 ## Theme
 
@@ -53,6 +57,8 @@ This moved the global DOM side effect into the same module that owns theme state
 The root `routes/+layout.svelte` has therefore been simplified. It still imports the theme stylesheets, initializes the shared theme store on startup, registers the service worker, initializes the client auth store, and renders the global offline pill and snackbar, but it no longer needs a dedicated reactive effect just to synchronize document theme classes.
 
 For authenticated sections, database-backed theme preferences can still be loaded from the `settings` table and then pushed into the shared theme manager when needed. This allows persisted account settings to override browser-derived defaults while keeping one centralized implementation for live theme application.
+
+The settings page integrates directly with this shared theme manager, so changing the theme preference updates the current UI immediately while also feeding into the same persisted autosave flow used for the rest of the settings state.
 
 ## Ranked Matchmaking
 
