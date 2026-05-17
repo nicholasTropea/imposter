@@ -88,6 +88,28 @@ The lobby also subscribes to `UPDATE` events on `ranked_games`. When the game st
 
 To avoid a race condition where the game may already have started before the subscription becomes active, the lobby performs an immediate status check on mount and navigates directly if needed.
 
+### Connection recovery
+
+The lobby handles connectivity loss and channel failures through a layered recovery strategy. A `mounted` flag prevents the `$effect`-based reconnect handler from running during the initial mount cycle, avoiding duplicate fetches and channel setup races that would otherwise occur because Svelte effects run immediately on first render alongside `onMount`.
+
+When the Realtime channel encounters a `CHANNEL_ERROR`, `TIMED_OUT`, or `CLOSED` status, the lobby tears down the existing channel and recreates it after a 1-second debounce. Guards prevent duplicate reconnect attempts, and the flow is skipped entirely while the client is offline or the component has been destroyed.
+
+A `$effect` reacts to the shared `offline` store. When connectivity is lost, the UI displays an offline message. When it returns, the lobby immediately refetches membership and the full player list, then recreates the channel if none exists. This ensures that events missed during a disconnection window are recovered through authoritative state reads rather than relying solely on Realtime delivery.
+
+Players can also manually trigger a reconnect through a **Retry Now** button, which appears alongside a **Back Home** button whenever the client is in a reconnecting state.
+
+### Membership validation
+
+On mount, on every successful channel subscription, and after every reconnect, the lobby calls `refreshMembership` to verify the player still belongs to the game. This is especially important after extended disconnections, during which the heartbeat-based eviction job may have removed the player from `ranked_game_players`. If membership is gone, the client navigates back to `/home` immediately. Membership checks are skipped if an intentional leave is already in progress.
+
+### Leaving the lobby
+
+Players can leave the lobby at any time through a **Leave Lobby** button. When triggered, the function sets `leaving = true` and `destroyed = true` to immediately suppress any concurrent Realtime callbacks and prevent navigation races during the brief window between the database delete and client-side navigation. The channel is removed first, then the player's row is deleted from `ranked_game_players`. On success the client navigates to `/home`. If the delete fails, both flags are restored so the lobby remains usable.
+
+### Cleanup
+
+On component destroy, the heartbeat is stopped, the Realtime channel is removed, and any pending resubscribe timeout is cleared.
+
 ## Game Flow
 
 The game logic is managed primarily at the database level. Each round progresses through this phase sequence:
