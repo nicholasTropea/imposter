@@ -98,15 +98,15 @@ async function getSelfData(
  */
 export const load: PageServerLoad = async ({ params, locals, parent }) => {
     const { userId } = await parent();
-    if (!userId) redirect(303, '/login');
+    if (!userId) throw redirect(303, '/login');
     
     const { gameId } = params;  // UUID from the URL
     const game = await getGame(gameId, locals);
 
-    if (!game) redirect(307, '/home');
+    if (!game) throw redirect(307, '/home');
 
     // Redirect to lobby if game isn't running
-    if (game.status !== 'in_progress') redirect(307, `/game_lobby/${gameId}`);
+    if (game.status !== 'in_progress') throw redirect(307, `/game_lobby/${gameId}`);
 
     const [players, selfInfo] = await Promise.all([
         getNicknames(gameId, locals),
@@ -114,7 +114,7 @@ export const load: PageServerLoad = async ({ params, locals, parent }) => {
     ]);
 
     // Redirect to home if user is not part of the game
-    if (!players.some(p => p.user_id === userId)) redirect(307, '/home');
+    if (!players.some(p => p.user_id === userId)) throw redirect(307, '/home');
 
     return { gameId, game, players, role: selfInfo.role, word: selfInfo.word };
 }
@@ -123,7 +123,7 @@ export const load: PageServerLoad = async ({ params, locals, parent }) => {
 export const actions: Actions = {
     submitWord: async ({ request, params, locals: { safeGetSession, supabase } }) => {
         const { user } = await safeGetSession()
-        if (!user) redirect(303, '/login');
+        if (!user) throw redirect(303, '/login');
 
         const { gameId } = params;
         const formData = await request.formData();
@@ -165,7 +165,7 @@ export const actions: Actions = {
 
     castVote: async ({ request, params, locals: { safeGetSession, supabase } }) => {
         const { user } = await safeGetSession();
-        if (!user) return redirect(303, '/login');
+        if (!user) throw redirect(303, '/login');
 
         const { gameId } = params;
         const formData = await request.formData();

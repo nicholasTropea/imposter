@@ -6,6 +6,7 @@
     import { supabase } from '$lib/supabase';
     import { dev } from '$app/environment';
     import { goto } from '$app/navigation';
+    import { offline } from '$lib/stores/network';
 
     import { BottomSheet } from 'm3-svelte';
 
@@ -94,8 +95,8 @@
 
     // ── Chat Helpers ───────────────────────────────────────────────────────────────────
     function sendMessage() {
-        // guard: sent before onMount ran, shouldn't happen
-        if (!channel) return;
+        // guard: sent before onMount ran or offline, shouldn't happen
+        if (!channel || $offline) return;
         
         const text = chatInput.trim();
         if (!text ) return;
@@ -117,8 +118,61 @@
         chatInput = '';
     }
 
+    // ── Reconnection ───────────────────────────────────────────────────────────────────
+    let wasOffline = false;
+    
+    async function refreshGameState() {
+        const { data: game } = await supabase
+            .from('ranked_games')
+            .select('*')
+            .eq('id', data.gameId)
+            .single();
+
+        if (!game) return;
+
+        activeId = game.active_player_id ?? null;
+        phase = game.phase;
+        deadline = game.phase_deadline ? new Date(game.phase_deadline) : null;
+        round = game.round_number;
+        eliminatedRole = game.eliminated_role as Role;
+        winner = game.status === 'finished' ? game.winner as Role : null;
+
+        if (game.phase !== 'results') eliminatedNickname = null;
+
+        updateProgress();
+    }
+
+    $effect(() => {
+        const isOffline = $offline;
+
+        if (!mounted) {
+            wasOffline = $offline;
+            return;
+        }
+
+        // online -> offline
+        if (isOffline && !wasOffline) {
+            wasOffline = true;
+            return;
+        }
+
+        // online -> online (first effect run, ignore)
+        if (!wasOffline) {
+            wasOffline = $offline;
+            return;
+        }
+
+        // offline -> online, refresh state
+        wasOffline = false;
+        refreshGameState();
+    });
+
     // ── Lifecycle ──────────────────────────────────────────────────────────────────────
+    let mounted = false;
+    
     onMount(() => {
+        mounted = true;
+        
         if (dev) {
             supabase.auth.getSession().then(r => console.log('session:', r.data.session));
         }
@@ -149,6 +203,9 @@
                 wordInput = '';
                 round = updatedGame.round_number;
                 eliminatedRole = updatedGame.eliminated_role;
+                winner = updatedGame.status === 'finished'
+                    ? updatedGame.winner
+                    : null;
 
                 // remove the eliminated player from the local list
                 if (
@@ -322,10 +379,11 @@
                 }}
             >
                 <input type = 'hidden' name = 'assignedWord' value = {data.word ?? ''} />
+                
                 <input
                     type = 'text'
                     name = 'word'
-                    bind:value={wordInput}
+                    bind:value={ wordInput }
                     placeholder = 'Enter a word...'
                     autocomplete = 'off'
                     maxlength = {50}
@@ -335,7 +393,7 @@
                     <p class = 'error'>{form.error}</p>
                 {/if}
 
-                <button type = 'submit' disabled = {!wordInput.trim()}>
+                <button type = 'submit' disabled = {!wordInput.trim() || $offline } >
                     Submit Word
                 </button>
             </form>
@@ -372,7 +430,7 @@
                                 class:voted = { isVoted }
                                 class:dimmed = { (votedFor !== null && !isVoted) || isMe }
                                 class:isMe
-                                disabled = { isMe || eliminated }
+                                disabled = { isMe || eliminated || $offline }
                             >
                                 <span class = 'voteBadge'>
                                     { voteCounts[player.user_id] ?? 0 }
@@ -423,7 +481,7 @@
                         type = 'submit'
                         class:voted = { votedFor === 'skip'}
                         class:dimmed = { votedFor !== null && votedFor !== 'skip' }
-                        disabled = { eliminated }
+                        disabled = { eliminated || $offline }
                     >
                         <span class = 'voteBadge'>
                             { voteCounts['skip'] ?? 0 }
@@ -514,7 +572,10 @@
                         onkeydown = {(e) => e.key === 'Enter' && sendMessage()}
                     />
 
-                    <button onclick = {sendMessage} disabled = {!chatInput.trim()}>
+                    <button
+                        onclick = { sendMessage }
+                        disabled = { !chatInput.trim() || $offline }
+                    >
                         Send
                     </button>
                 </div>

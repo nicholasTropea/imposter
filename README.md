@@ -179,6 +179,14 @@ Clients detect the end through the `ranked_games` `UPDATE` subscription:
 - If the game ends during `results`, the client waits for the result timer before redirecting.
 - If the game ends in another phase, the client redirects immediately.
 
+### Offline handling during active games
+
+The active ranked game page now includes client-side offline handling in addition to the lobby-level recovery logic. If the device loses connectivity during an ongoing match, the page remains open and continues rendering the local timer/UI state, but all online-only actions are temporarily disabled.
+
+This means players cannot submit words, cast votes, or send voting-phase chat messages while the shared `offline` store reports that the client is disconnected. The page intentionally does not expose a leave or back action during the match, so temporary connectivity issues do not make abandonment easier.
+
+When connectivity returns, the client performs a one-shot refetch of the authoritative `ranked_games` row and reapplies the current phase, active player, deadline, round number, eliminated role, and winner state. This reconnect recovery ensures that phase transitions or game-end updates missed during the offline window are synchronized before normal Realtime updates continue.
+
 ## Player Disconnection
 
 The application tracks player connectivity through a heartbeat mechanism. While a player is on a game-related page such as the loading screen, lobby, or active game, the client sends a heartbeat to `POST /api/heartbeat` every 5 seconds using `navigator.sendBeacon`.
@@ -247,6 +255,8 @@ The service worker is registered client-side from `routes/+layout.svelte` using 
 In addition to service-worker-based offline loading, the app includes a global connectivity utility. `isEffectivelyOffline()` performs a real network probe instead of trusting `navigator.onLine` alone, `offline` exposes a shared store with polling and browser online/offline listeners, and `onlineGuard` provides reusable helpers for protecting navigation and form submissions that require a live connection.
 
 The current routing design builds on that PWA setup by making both `/` and `/home` part of the offline-capable shell, while backend-dependent operations remain explicitly guarded. This makes the application more resilient under unstable connectivity without exposing server-backed actions indiscriminately.
+
+That connectivity layer is now also used directly inside real-time gameplay screens. In practice, the active ranked game page disables server-backed actions while offline and performs an authoritative state refresh when the client comes back online, reducing desynchronization after temporary network loss.
 
 ## Type System
 
