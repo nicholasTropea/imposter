@@ -1,5 +1,3 @@
-// src/lib/stores/auth.ts
-
 import { browser } from '$app/environment';
 import { get, writable } from 'svelte/store';
 import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
@@ -23,12 +21,7 @@ type AuthState = {
 };
 
 function createAuthStore() {
-	/*
-	 * Internal writable store.
-	 *
-	 * It starts in a "not ready" state because on first load
-	 * we still need to ask Supabase for the current browser session.
-	 */
+	/* Initially not ready since the current browser session needs to be fetched. */
 	const store = writable<AuthState>({
 		ready: false,
 		user: null
@@ -36,26 +29,14 @@ function createAuthStore() {
 
 	const { subscribe, set } = store;
 
-	/*
-	 * Tracks whether the auth listener has already been attached.
-	 * We only want to start the browser-side auth machinery once.
-	 */
+	/* Tracks whether the auth listener has already been attached. */
 	let started = false;
 
-	/*
-	 * Reference to the Supabase auth subscription so we can clean it up later.
-	 */
+	/* Reference to the Supabase auth subscription so it can clean it up later. */
 	let authSubscription: { unsubscribe: () => void } | null = null;
 
 	/*
 	 * Reads the current auth session from the browser-side Supabase client.
-	 *
-	 * What it uses:
-	 * - Supabase browser auth state via supabase.auth.getSession()
-	 *
-	 * Why:
-	 * - public pages like /home should be able to know whether the browser
-	 *   currently has a logged-in user without relying on a server load
 	 *
 	 * Important:
 	 * - this is for UI state only
@@ -71,16 +52,11 @@ function createAuthStore() {
 			return null;
 		}
 
-		const {
-			data: { session }
-		} = await supabase.auth.getSession();
+		const { data: { session } } = await supabase.auth.getSession();
 
 		const user = session?.user ?? null;
 
-		set({
-			ready: true,
-			user
-		});
+		set({ ready: true, user });
 
 		return user;
 	}
@@ -118,12 +94,7 @@ function createAuthStore() {
 		authSubscription = data.subscription;
 	}
 
-	/*
-	 * Stops the store by unsubscribing from Supabase auth events.
-	 *
-	 * This is optional for app-wide usage, but useful to keep the store
-	 * well-behaved and reusable.
-	 */
+	/* Stops the store by unsubscribing from Supabase auth events. */
 	function stop(): void {
 		if (!started) return;
 		started = false;
@@ -142,26 +113,11 @@ function createAuthStore() {
 		 */
 		subscribe,
 
-		/*
-		 * Public method to initialize the auth store.
-		 *
-		 * Typical usage:
-		 * - call auth.init() once from a public layout or page
-		 * - after that, components can reactively read $auth
-		 */
-		init(): void {
-			start();
-		},
+		/* Public method to initialize the auth store. */
+		init(): void { start(); },
 
-		/*
-		 * Public cleanup method.
-		 *
-		 * Usually only needed if you explicitly want to stop listening
-		 * to auth events, for example in a manually managed lifecycle.
-		 */
-		destroy(): void {
-			stop();
-		},
+		/* Public cleanup method. */
+		destroy(): void { stop(); },
 
 		/*
 		 * Forces a fresh read of the current browser session.
@@ -179,9 +135,7 @@ function createAuthStore() {
 		 * Returns the latest cached auth state synchronously,
 		 * without triggering a new Supabase call.
 		 */
-		getSnapshot(): AuthState {
-			return get(store);
-		}
+		getSnapshot(): AuthState { return get(store); }
 	};
 }
 
