@@ -25,6 +25,7 @@
     let eliminatedNickname: string | null = $state(null);
     let eliminatedRole: Role | null = $state(null);
     let winner: Role | null = $state<Role | null>(null);
+    let roundNumber: number = $state<number>(1);
 
     // ── Constants ──────────────────────────────────────────────────────────────────────
     const SKIP_UUID = crypto.randomUUID();
@@ -80,7 +81,13 @@
         }));
     }
 
+    // prevent double firing
+    let advancing = false;
+
     function handlePhaseClick(): void {
+        if (advancing) return;
+        advancing = true;
+
         if (playerIndex === players.length - 1) {
             if (phase === 'role_show') phase = 'word_input';
             else if (phase === 'word_input') phase = 'elimination';
@@ -88,9 +95,15 @@
 
         showRole = false;
         increaseIndex();
+
+        setTimeout(() => {
+            advancing = false;
+        }, 150);
     }
 
     function confirmElimination(): void {
+        roundNumber++;
+        
         // no elimination
         if (votedFor === null || votedFor === SKIP_UUID) {
             eliminatedNickname = null;
@@ -200,11 +213,11 @@
             </div>
 
             <div class = 'roundInfo'>
-                Round — { Math.floor(playerIndex / players.length) + 1 }
+                Round - { roundNumber }
             </div>
 
             <Button variant = 'filled' onclick = { handlePhaseClick } >
-                { playerIndex === players.length - 1 ? 'Go to Vote 🗳' : 'Next →' }
+                { playerIndex === players.length - 1 ? 'Go to Vote' : 'Next ->' }
             </Button>
         </div>
 
