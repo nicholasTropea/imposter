@@ -264,6 +264,20 @@ The current routing design builds on that PWA setup by making both `/` and `/hom
 
 That connectivity layer is now also used directly inside real-time gameplay screens. In practice, the active ranked game page disables server-backed actions while offline and performs an authoritative state refresh when the client comes back online, reducing desynchronization after temporary network loss.
 
+## Push Notifications
+
+The application now includes the first part of a Web Push notification architecture for authenticated players.
+
+A new `push_subscriptions` table stores per-device browser push subscriptions, including the subscription endpoint, cryptographic keys, user agent, timestamps, and active state. The table references the `players` table so subscriptions remain aligned with the rest of the app’s domain model.
+
+A separate `notification_outbox` table has also been introduced to support event-driven notification delivery. This table is intended to hold backend-generated notification events decoupled from the core game transaction flow.
+
+On the client side, `lib/utils/push.ts` provides a reusable `subscribeToPush` helper. It requests notification permission, waits for the service worker registration, reuses an existing Push API subscription when available, and otherwise creates a new one using the public VAPID key.
+
+Once the browser subscription is resolved, the helper sends the endpoint and cryptographic keys to `POST /api/push_subscription`. That endpoint validates the payload, requires an authenticated session, and upserts the subscription into `push_subscriptions`, refreshing `last_used_at` and marking the subscription active.
+
+At the current stage, this push-notification work covers subscription registration and persistence only. Delivery, service-worker push event handling, notification click handling, and game-start notification dispatch are not yet implemented.
+
 ## Type System
 
 The file `lib/types/supabase.ts` is auto-generated from the Supabase schema and is kept aligned with database changes including table names, new columns, RPC functions, and enum updates.
