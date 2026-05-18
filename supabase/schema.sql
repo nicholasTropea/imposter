@@ -1,8 +1,12 @@
+-- Schema dump from Supabase (public schema only)
+-- Regenerate with:
+-- pg_dump "postgresql://postgres.[PROJECT ID]:[DATABASE PASSWORD]@aws-1-eu-central-1.pooler.supabase.com:5432/postgres"
+-- --schema-only --schema=public --no-owner --no-privileges --file supabase/schema.sql
 --
 -- PostgreSQL database dump
 --
 
-\restrict X6a24Ccb9U75KueI3Q0P1zPimXVGZDGLBIKcd1BwV9W3irXfDsnWRk1c4We7zpn
+\restrict JH59drRtfou5lFRZFE4urEVvfTJVOXxXsT71CFvoEma2YsfYoQEvXagXXellb4Q
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg24.04+1)
@@ -932,6 +936,20 @@ ALTER TABLE ONLY public.game_rounds REPLICA IDENTITY FULL;
 
 
 --
+-- Name: notification_outbox; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.notification_outbox (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    type text NOT NULL,
+    game_id uuid,
+    payload jsonb DEFAULT '{}'::jsonb NOT NULL,
+    processed_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: players; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -943,6 +961,23 @@ CREATE TABLE public.players (
     civilian_wins integer DEFAULT 0 NOT NULL,
     imposter_wins integer DEFAULT 0 NOT NULL,
     spy_wins integer DEFAULT 0 NOT NULL
+);
+
+
+--
+-- Name: push_subscriptions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.push_subscriptions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    player_id uuid NOT NULL,
+    endpoint text NOT NULL,
+    p256dh text NOT NULL,
+    auth text NOT NULL,
+    user_agent text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_used_at timestamp with time zone DEFAULT now() NOT NULL,
+    is_active boolean DEFAULT true NOT NULL
 );
 
 
@@ -1031,6 +1066,14 @@ ALTER TABLE ONLY public.game_rounds
 
 
 --
+-- Name: notification_outbox notification_outbox_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notification_outbox
+    ADD CONSTRAINT notification_outbox_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: players profiles_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1044,6 +1087,22 @@ ALTER TABLE ONLY public.players
 
 ALTER TABLE ONLY public.players
     ADD CONSTRAINT profiles_username_key UNIQUE (nickname);
+
+
+--
+-- Name: push_subscriptions push_subscriptions_endpoint_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.push_subscriptions
+    ADD CONSTRAINT push_subscriptions_endpoint_key UNIQUE (endpoint);
+
+
+--
+-- Name: push_subscriptions push_subscriptions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.push_subscriptions
+    ADD CONSTRAINT push_subscriptions_pkey PRIMARY KEY (id);
 
 
 --
@@ -1140,11 +1199,27 @@ ALTER TABLE ONLY public.game_rounds
 
 
 --
+-- Name: notification_outbox notification_outbox_game_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notification_outbox
+    ADD CONSTRAINT notification_outbox_game_id_fkey FOREIGN KEY (game_id) REFERENCES public.ranked_games(id) ON DELETE CASCADE;
+
+
+--
 -- Name: players profiles_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.players
     ADD CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: push_subscriptions push_subscriptions_player_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.push_subscriptions
+    ADD CONSTRAINT push_subscriptions_player_id_fkey FOREIGN KEY (player_id) REFERENCES public.players(id) ON DELETE CASCADE;
 
 
 --
@@ -1191,5 +1266,5 @@ ALTER TABLE ONLY public.settings
 -- PostgreSQL database dump complete
 --
 
-\unrestrict X6a24Ccb9U75KueI3Q0P1zPimXVGZDGLBIKcd1BwV9W3irXfDsnWRk1c4We7zpn
+\unrestrict JH59drRtfou5lFRZFE4urEVvfTJVOXxXsT71CFvoEma2YsfYoQEvXagXXellb4Q
 

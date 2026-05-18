@@ -63,6 +63,41 @@ export type Database = {
           },
         ]
       }
+      notification_outbox: {
+        Row: {
+          created_at: string
+          game_id: string | null
+          id: string
+          payload: Json
+          processed_at: string | null
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          game_id?: string | null
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          type: string
+        }
+        Update: {
+          created_at?: string
+          game_id?: string | null
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_outbox_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "ranked_games"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       players: {
         Row: {
           civilian_wins: number
@@ -92,6 +127,50 @@ export type Database = {
           spy_wins?: number
         }
         Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          is_active: boolean
+          last_used_at: string
+          p256dh: string
+          player_id: string
+          user_agent: string | null
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          is_active?: boolean
+          last_used_at?: string
+          p256dh: string
+          player_id: string
+          user_agent?: string | null
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          is_active?: boolean
+          last_used_at?: string
+          p256dh?: string
+          player_id?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ranked_game_players: {
         Row: {
