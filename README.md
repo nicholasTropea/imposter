@@ -252,31 +252,33 @@ When the local game ends, players can either return to `/local_game/settings` to
 
 ## Progressive Web App Setup
 
-The application is configured as a Progressive Web App (PWA) using `@vite-pwa/sveltekit`, which integrates manifest generation and service worker support with SvelteKit.
+The application is configured as a Progressive Web App (PWA) using `@vite-pwa/sveltekit` and `adapter-static`. This combination ensures that the application shell is fully prerendered and available offline.
 
-The manifest defines the app name, short name, display mode (`standalone`), start URL, theme colors, and required icons. The application launches from `/`, and the app shell is designed to load even when the network is unavailable because static assets are precached for offline use.
+The PWA setup uses a custom service worker (`src/service-worker.ts`) with the `injectManifest` strategy. This allows for fine-grained control over caching and navigation routing.
 
-The service worker is registered client-side from `routes/+layout.svelte` using `virtual:pwa-register`. Static assets are precached, and navigation fallback is configured so the application shell can still load when a route request cannot be fulfilled from the network.
+Key PWA features:
+- **Prerendered App Shell:** The root landing page (`/`) is prerendered with SSR enabled, serving as a visually complete and functional shell when the device is offline.
+- **Robust Navigation Fallback:** The service worker implements a custom `NavigationRoute` that attempts to serve the cached `/` (index.html) for any navigation request. If `/` is not in the precache manifest, it falls back to `index.html` or the network, ensuring the app never shows a "No Internet" page.
+- **Static Adapter:** Switching to `@sveltejs/adapter-static` ensures that all routes intended for the offline shell are exported as static files during build.
+- **Manual Registration:** Service worker registration is handled manually in `src/routes/+layout.svelte` using `virtual:pwa-register` to avoid conflicts with SvelteKit's built-in service worker logic.
 
 In addition to service-worker-based offline loading, the app includes a global connectivity utility. `isEffectivelyOffline()` performs a real network probe instead of trusting `navigator.onLine` alone, `offline` exposes a shared store with polling and browser online/offline listeners, and `onlineGuard` provides reusable helpers for protecting navigation and form submissions that require a live connection.
 
-The current routing design builds on that PWA setup by making both `/` and `/home` part of the offline-capable shell, while backend-dependent operations remain explicitly guarded. This makes the application more resilient under unstable connectivity without exposing server-backed actions indiscriminately.
-
-That connectivity layer is now also used directly inside real-time gameplay screens. In practice, the active ranked game page disables server-backed actions while offline and performs an authoritative state refresh when the client comes back online, reducing desynchronization after temporary network loss.
-
 ## Push Notifications
 
-The application now includes the first part of a Web Push notification architecture for authenticated players.
+The application includes a Web Push notification architecture for authenticated players.
 
-A new `push_subscriptions` table stores per-device browser push subscriptions, including the subscription endpoint, cryptographic keys, user agent, timestamps, and active state. The table references the `players` table so subscriptions remain aligned with the rest of the app’s domain model.
+A `push_subscriptions` table stores per-device browser push subscriptions, including the subscription endpoint, cryptographic keys, and active state. The table references the `players` table so subscriptions remain aligned with the rest of the app’s domain model.
 
 A separate `notification_outbox` table has also been introduced to support event-driven notification delivery. This table is intended to hold backend-generated notification events decoupled from the core game transaction flow.
 
 On the client side, `lib/utils/push.ts` provides a reusable `subscribeToPush` helper. It requests notification permission, waits for the service worker registration, reuses an existing Push API subscription when available, and otherwise creates a new one using the public VAPID key.
 
-Once the browser subscription is resolved, the helper sends the endpoint and cryptographic keys to `POST /api/push_subscription`. That endpoint validates the payload, requires an authenticated session, and upserts the subscription into `push_subscriptions`, refreshing `last_used_at` and marking the subscription active.
+The service worker (`src/service-worker.ts`) handles the following push events:
+- **`push`**: Listens for incoming push messages, parses the JSON payload, and displays a native notification using `self.registration.showNotification`.
+- **`notificationclick`**: Handles user interaction with notifications. It attempts to focus an existing window or open a new one, navigating the client to the URL provided in the notification data (defaulting to `/home`).
 
-At the current stage, this push-notification work covers subscription registration and persistence only. Delivery, service-worker push event handling, notification click handling, and game-start notification dispatch are not yet implemented.
+Subscription registration is performed through the `POST /api/push_subscription` endpoint, which validates the payload and upserts the subscription into the database for the authenticated user.
 
 ## Type System
 

@@ -1,4 +1,4 @@
-import adapter from '@sveltejs/adapter-auto';
+import adapter from '@sveltejs/adapter-static';
 import { relative, sep } from 'node:path';
 
 /** @type {import('@sveltejs/kit').Config} */
@@ -14,7 +14,13 @@ const config = {
 		}
 	},
 	kit: {
-		adapter: adapter(),
+		adapter: adapter({
+			fallback: 'ignore.html'
+		}),
+
+		serviceWorker: {
+			register: false
+		},
 
 		alias: {
 			$components: 'src/lib/components'

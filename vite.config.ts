@@ -18,7 +18,14 @@ export default defineConfig({
 		// PWA
 		SvelteKitPWA({
 			registerType: 'autoUpdate',
-			injectRegister: 'auto',
+			injectRegister: false,
+			strategies: 'injectManifest',
+			srcDir: 'src',
+			filename: 'service-worker.ts',
+			injectManifest: {
+				globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2,woff}'],
+				globIgnores: ['service-worker.js', 'offline.html']
+			},
 			manifest: {
 				name: 'Imposter Words',
 				short_name: 'Imposter',
@@ -42,9 +49,9 @@ export default defineConfig({
 					}
 				]
 			},
-			workbox: {
-				navigateFallback: '/',
-				globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}']
+			devOptions: {
+				enabled: true,
+				type: 'module'
 			}
 		})
 	]
