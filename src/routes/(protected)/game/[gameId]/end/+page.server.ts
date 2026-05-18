@@ -7,7 +7,7 @@ export const load: PageServerLoad = async (
     { params, url, parent, locals: { supabase } }
 ) => {
     const { userId } = await parent();
-    if (!userId) redirect(303, '/login');
+    if (!userId) throw redirect(303, '/login');
 
     const { gameId } = params;  // UUID from the URL
 

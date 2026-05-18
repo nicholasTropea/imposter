@@ -19,6 +19,9 @@
     };
 
     onMount(() => {
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+        let frameId: number | null = null;
+        
         setTimeout(() => {
             const start = data.previousElo;
             const end = data.currentElo;
@@ -33,8 +36,13 @@
                 if (t < 1) requestAnimationFrame(step);
             }
 
-            requestAnimationFrame(step);
+            frameId = requestAnimationFrame(step);
         }, 800);
+
+        return () => {
+            if (timeoutId) clearTimeout(timeoutId);
+            if (frameId) cancelAnimationFrame(frameId);
+        }
     });
 </script>
 

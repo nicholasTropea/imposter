@@ -179,6 +179,12 @@ Clients detect the end through the `ranked_games` `UPDATE` subscription:
 - If the game ends during `results`, the client waits for the result timer before redirecting.
 - If the game ends in another phase, the client redirects immediately.
 
+### Offline handling on the end page
+
+The final result page also includes lightweight client-side offline handling. Once the page has loaded, the Elo summary and winner UI remain visible locally.
+
+The page cleans up its delayed Elo-count animation on component destroy by cancelling both the pending timeout and any scheduled `requestAnimationFrame`. This prevents orphaned animation work if the user leaves the page before the counter finishes animating.
+
 ### Offline handling during active games
 
 The active ranked game page now includes client-side offline handling in addition to the lobby-level recovery logic. If the device loses connectivity during an ongoing match, the page remains open and continues rendering the local timer/UI state, but all online-only actions are temporarily disabled.
