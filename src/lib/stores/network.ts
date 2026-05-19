@@ -10,7 +10,7 @@ function createOfflineStore() {
 	 * - true  => app should behave as offline
 	 * - false => app can behave as online
 	 */
-	const store = writable(true);
+	const store = writable(false);
 	const { subscribe, set } = store;
 
 	/*
@@ -50,7 +50,7 @@ function createOfflineStore() {
 	 * - false => online
 	 */
 	async function verifyConnection(): Promise<boolean> {
-		if (!browser) return true;
+		if (!browser) return false;
 
 		/*
 		 * If a check is already running, reuse it.

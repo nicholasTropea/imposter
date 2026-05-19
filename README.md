@@ -257,7 +257,8 @@ The application is configured as a Progressive Web App (PWA) using `@vite-pwa/sv
 The PWA setup uses a custom service worker (`src/service-worker.ts`) with the `injectManifest` strategy. This allows for fine-grained control over caching and navigation routing.
 
 Key PWA features:
-- **Prerendered App Shell:** The root landing page (`/`) is prerendered with SSR enabled, serving as a visually complete and functional shell when the device is offline.
+- **App Shell Pattern:** The root landing page (`/`) is prerendered with SSR disabled. This provides a clean, blank shell (`index.html`) that serves as the entry point for all routes, preventing content flicker during hydration while ensuring offline availability.
+- **Flicker-Free Connectivity:** The shared `offline` store defaults to `false` and assumes online status during SSR/prerendering. This prevents the "Offline" UI pill from flickering on page load before the first network probe completes.
 - **Robust Navigation Fallback:** The service worker implements a custom `NavigationRoute` that attempts to serve the cached `/` (index.html) for any navigation request. If `/` is not in the precache manifest, it falls back to `index.html` or the network, ensuring the app never shows a "No Internet" page.
 - **Static Adapter:** Switching to `@sveltejs/adapter-static` ensures that all routes intended for the offline shell are exported as static files during build.
 - **Manual Registration:** Service worker registration is handled manually in `src/routes/+layout.svelte` using `virtual:pwa-register` to avoid conflicts with SvelteKit's built-in service worker logic.
