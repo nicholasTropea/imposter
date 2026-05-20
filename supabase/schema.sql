@@ -6,7 +6,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict JH59drRtfou5lFRZFE4urEVvfTJVOXxXsT71CFvoEma2YsfYoQEvXagXXellb4Q
+\restrict 3PP5AMsbn8VZblxKLdTYqp2fOsqrsim76j1lvHIMos7gBUjNgjZLQPYhTyznNGj
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg24.04+1)
@@ -763,6 +763,16 @@ BEGIN
             phase            = 'word_input',
             phase_deadline   = now() + interval '15 seconds' -- first turn starts immediately
         WHERE id = v_result_game_id;
+
+        -- Notification: Game Started
+        INSERT INTO public.notification_outbox (type, game_id, payload)
+        VALUES (
+            'game_start',
+            v_result_game_id,
+            jsonb_build_object(
+                'message', 'The game has started!'
+            )
+        );
     END IF;
 
     -- Returns the game UUID to the caller (the SvelteKit .rpc() call)
@@ -1175,6 +1185,13 @@ CREATE TRIGGER on_word_submitted AFTER INSERT ON public.game_rounds FOR EACH ROW
 
 
 --
+-- Name: notification_outbox send_push_notification; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER send_push_notification AFTER INSERT ON public.notification_outbox FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('https://rsimwvkiyhpfpjpqhche.supabase.co/functions/v1/send-push', 'POST', '{"Content-type":"application/json","Authorization":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJzaW13dmtpeWhwZnBqcHFoY2hlIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjM0OTc4MCwiZXhwIjoyMDg3OTI1NzgwfQ.mgZeMICdgiJmxY8peg_BDQQW2aPUzGObnVl9hvS2r1Y"}', '{}', '5000');
+
+
+--
 -- Name: game_rounds game_rounds_game_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1266,5 +1283,5 @@ ALTER TABLE ONLY public.settings
 -- PostgreSQL database dump complete
 --
 
-\unrestrict JH59drRtfou5lFRZFE4urEVvfTJVOXxXsT71CFvoEma2YsfYoQEvXagXXellb4Q
+\unrestrict 3PP5AMsbn8VZblxKLdTYqp2fOsqrsim76j1lvHIMos7gBUjNgjZLQPYhTyznNGj
 

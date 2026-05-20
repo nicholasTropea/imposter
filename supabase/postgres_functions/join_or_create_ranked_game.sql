@@ -121,6 +121,16 @@ BEGIN
             phase            = 'word_input',
             phase_deadline   = now() + interval '15 seconds' -- first turn starts immediately
         WHERE id = v_result_game_id;
+
+        -- Notification: Game Started
+        INSERT INTO public.notification_outbox (type, game_id, payload)
+        VALUES (
+            'game_start',
+            v_result_game_id,
+            jsonb_build_object(
+                'message', 'The game has started!'
+            )
+        );
     END IF;
 
     -- Returns the game UUID to the caller (the SvelteKit .rpc() call)

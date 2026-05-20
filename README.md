@@ -273,7 +273,7 @@ The application includes a Web Push notification architecture for authenticated 
 
 A `push_subscriptions` table stores per-device browser push subscriptions, including the subscription endpoint, cryptographic keys, and active state. The table references the `players` table so subscriptions remain aligned with the rest of the app’s domain model.
 
-A separate `notification_outbox` table has also been introduced to support event-driven notification delivery. This table is intended to hold backend-generated notification events decoupled from the core game transaction flow.
+A separate `notification_outbox` table supports event-driven notification delivery. When a ranked game starts, a record is inserted into this table. An `AFTER INSERT` trigger (`send_push_notification`) on `notification_outbox` automatically triggers the `send-push` Supabase Edge Function (`supabase/functions/send-push`). This edge function retrieves the game's players, queries their push subscriptions, sends Web Push notifications to each device, and updates the outbox row's `processed_at` timestamp.
 
 On the client side, `lib/utils/push.ts` provides a reusable `subscribeToPush` helper. It requests notification permission, waits for the service worker registration, reuses an existing Push API subscription when available, and otherwise creates a new one using the public VAPID key.
 
