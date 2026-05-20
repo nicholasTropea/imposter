@@ -1188,7 +1188,7 @@ CREATE TRIGGER on_word_submitted AFTER INSERT ON public.game_rounds FOR EACH ROW
 -- Name: notification_outbox send_push_notification; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER send_push_notification AFTER INSERT ON public.notification_outbox FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('https://rsimwvkiyhpfpjpqhche.supabase.co/functions/v1/send-push', 'POST', '{"Content-type":"application/json","Authorization":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJzaW13dmtpeWhwZnBqcHFoY2hlIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjM0OTc4MCwiZXhwIjoyMDg3OTI1NzgwfQ.mgZeMICdgiJmxY8peg_BDQQW2aPUzGObnVl9hvS2r1Y"}', '{}', '5000');
+CREATE TRIGGER send_push_notification AFTER INSERT ON public.notification_outbox FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('https://rsimwvkiyhpfpjpqhche.supabase.co/functions/v1/send-push', 'POST', '{"Content-type":"application/json","apikey":"sb_secret_SECRET_KEY"}', '{}', '5000');
 
 
 --
