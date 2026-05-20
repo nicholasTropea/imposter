@@ -56,3 +56,32 @@ export const POST: RequestHandler = async (
 
 	return json({ ok: true });
 };
+
+/**
+ * Deactivates or removes a specific Web Push subscription for the authenticated user.
+ * 
+ * The endpoint expects a JSON body containing the `endpoint` to be removed.
+ */
+export const DELETE: RequestHandler = async (
+    { request, locals: { safeGetSession, supabase } }
+) => {
+    const { user } = await safeGetSession();
+    if (!user) return json({ error: 'Unauthorized' }, { status: 401 });
+
+    const body = await request.json();
+    const { endpoint } = body ?? {};
+
+    if (typeof endpoint !== 'string') {
+        return json({ error: 'Invalid payload' }, { status: 400 });
+    }
+
+    const { error } = await supabase
+        .from('push_subscriptions')
+        .delete()
+        .eq('player_id', user.id)
+        .eq('endpoint', endpoint);
+
+    if (error) return json({ error: error.message }, { status: 500 });
+
+    return json({ ok: true });
+};

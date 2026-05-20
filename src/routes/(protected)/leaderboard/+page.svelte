@@ -36,59 +36,10 @@
 
     // ── Other ──────────────────────────────────────────────────────────────────────────
     const userInTop100 = untrack(() => data.userElo === null);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    import { subscribeToPush } from '$lib/utils/push';
-
-	let pushBusy = $state(false);
-	let pushError: string | null = $state(null);
-	let pushSuccess = $state(false);
-
-	async function handleEnablePush() {
-		pushBusy = true;
-		pushError = null;
-		pushSuccess = false;
-
-		try {
-			await subscribeToPush();
-			pushSuccess = true;
-		}
-        catch (err) { pushError = err instanceof Error ? err.message : 'Unknown error'; }
-        finally { pushBusy = false; }
-	}
 </script>
 
 
 <!-- HTML -->
- <button onclick={handleEnablePush} disabled={pushBusy}>
-	{pushBusy ? 'Enabling...' : 'Enable notifications'}
-</button>
-
-{#if pushSuccess}
-	<p>Notifications enabled.</p>
-{/if}
-
-{#if pushError}
-	<p>{pushError}</p>
-{/if}
- 
- 
- 
- 
 <div class = 'wrapper'>
     <main>
         <div class = 'leaderboard'>

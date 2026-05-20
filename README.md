@@ -281,7 +281,7 @@ The service worker (`src/service-worker.ts`) handles the following push events:
 - **`push`**: Listens for incoming push messages, parses the JSON payload, and displays a native notification using `self.registration.showNotification`.
 - **`notificationclick`**: Handles user interaction with notifications. It attempts to focus an existing window or open a new one, navigating the client to the URL provided in the notification data (defaulting to `/home`).
 
-Subscription registration is performed through the `POST /api/push_subscription` endpoint, which validates the payload and upserts the subscription into the database for the authenticated user.
+Subscription management is integrated into the settings page, allowing players to enable or disable notifications on their current device. Client-side state transitions are synchronized using the `subscribeToPush` and `unsubscribeFromPush` helpers. Subscriptions are registered via `POST /api/push_subscription` (which validates the payload and upserts the subscription) and removed via `DELETE /api/push_subscription` (which deletes the matching device subscription for the authenticated user).
 
 ## Type System
 

@@ -2,7 +2,7 @@
 	// ── Imports ────────────────────────────────────────────────────────────────────────
 	import SettingsSlider from '$components/ui/SettingsSlider.svelte';
 	import SettingsSwitch from '$components/ui/SettingsSwitch.svelte';
-	import { Card, ConnectedButtons, Button } from 'm3-svelte';
+	import { Card, ConnectedButtons, Button, Switch } from 'm3-svelte';
 
 	import NavBar from '$components/ui/NavBar.svelte';
 
@@ -16,6 +16,11 @@
 	import { offline } from '$lib/stores/network.js';
 	import { gotoIfOnline } from '$lib/utils/onlineGuard.js';
 	import { goto } from '$app/navigation';
+	import {
+		subscribeToPush,
+		unsubscribeFromPush,
+		getPushSubscription
+	} from '$lib/utils/push';
 
 	// ── Types ──────────────────────────────────────────────────────────────────────────
 	type Theme = 'dark' | 'light';
@@ -149,6 +154,13 @@
 	let gameInvites = $state<boolean>(initialSettings.game_invites);
 	let dailyRewards = $state<boolean>(initialSettings.daily_rewards);
 
+	let pushEnabled = $state<boolean>(false);
+	let pushPermission = $state<NotificationPermission | 'loading'>('loading');
+	let pushInitialized = false;
+	let pushProcessing = $state<boolean>(false);
+	let pushPendingSync: boolean | null = null;
+	let showPushHelp = $state<boolean>(false);
+
 	// ── Theme ──────────────────────────────────────────────────────────────────────────
 	/**
 	 * Updates the local theme selection for this page and immediately applies the
@@ -263,7 +275,84 @@
 		await saveSettingsToServer(pending);
 	}
 
+	// ── Push Notifications ─────────────────────────────────────────────────────────────
+	/**
+	 * Synchronizes the local push subscription state with the browser and server.
+	 *
+	 * If the user enables the switch, it requests permission and registers the
+	 * device. If they disable it, it unsubscribes from the browser and removes
+	 * the record from the database.
+	 *
+	 * @param enabled - The target subscription state.
+	 */
+	async function syncPush(enabled: boolean) {
+		if (pushProcessing) {
+			pushPendingSync = enabled;
+			return;
+		}
+
+		pushProcessing = true;
+
+		try {
+			if (enabled) await subscribeToPush();
+			else await unsubscribeFromPush();
+
+			// Update permission state after attempt
+			if (browser) pushPermission = Notification.permission;
+
+			// If a new request came in while we were processing, handle it next
+			if (pushPendingSync !== null && pushPendingSync !== enabled) {
+				const next = pushPendingSync;
+				pushPendingSync = null;
+				pushProcessing = false; // reset to allow next call
+				await syncPush(next);
+				return;
+			}
+		}
+		catch (err) {
+			console.error('Push sync failed:', err);
+			saveError = err instanceof Error
+				? err.message
+				: 'Could not update push settings.';
+
+			// Revert the switch if it failed
+			const sub = await getPushSubscription();
+			pushEnabled = !!sub;
+			pushPendingSync = null;
+			if (browser) pushPermission = Notification.permission;
+		}
+		finally { pushProcessing = false; }
+	}
+
+	function handlePushToggle() {
+		if (!pushInitialized || pushProcessing) return;
+		pushEnabled = !pushEnabled;
+	}
+
 	// ── Effects ────────────────────────────────────────────────────────────────────────
+	/**
+	 * Checks the current browser push subscription and permission on mount.
+	 */
+	$effect(() => {
+		if (!browser) return;
+
+		pushPermission = Notification.permission;
+		getPushSubscription().then((sub) => {
+			pushEnabled = !!sub;
+			pushInitialized = true;
+		});
+	});
+
+	/**
+	 * Watches the pushEnabled state and triggers synchronization when changed by the user.
+	 */
+	$effect(() => {
+		const enabled = pushEnabled;
+		if (!browser || !pushInitialized) return;
+
+		untrack(() => syncPush(enabled));
+	});
+
 	/**
 	 * Watches the local settings state and schedules autosave after changes.
 	 *
@@ -275,7 +364,14 @@
 	 * component is destroyed.
 	 */
 	$effect(() => {
-		const _ = [theme, masterVolume, musicVolume, soundEffects, gameInvites, dailyRewards];
+		const _ = [
+			theme,
+			masterVolume,
+			musicVolume,
+			soundEffects,
+			gameInvites,
+			dailyRewards
+		];
 
 		if (!browser) return;
 
@@ -336,6 +432,56 @@
 		</Card>
 
 		<Card variant = 'filled'>
+			<div class = 'push-setting'>
+				<div class = 'textContainer'>
+					<span> Push Notifications </span>
+					{#if pushPermission === 'denied'}
+						<span class = 'error-text'> Blocked by browser </span>
+					{:else if pushPermission === 'granted'}
+						<span> Enable on this device </span>
+					{:else}
+						<span> Receive game updates </span>
+					{/if}
+				</div>
+
+				<div class = 'action-container'>
+					{#if pushPermission === 'denied'}
+						<Button
+							variant = 'text'
+							onclick = { () => showPushHelp = !showPushHelp }
+						>
+							How to reset?
+						</Button>
+					{:else if pushPermission === 'granted'}
+						<Button
+							variant = 'tonal'
+							disabled = { true }
+						>
+							Enabled
+						</Button>
+					{:else}
+						<Button 
+							variant = 'tonal' 
+							onclick = { handlePushToggle } 
+							disabled = { pushProcessing }
+						>
+							{ pushProcessing ? 'Enabling...' : 'Enable' }
+						</Button>
+					{/if}
+				</div>
+			</div>
+
+			{#if showPushHelp}
+				<div class = 'help-box'>
+					<p> To enable notifications: </p>
+					<ol>
+						<li> Click the <strong>lock</strong> or <strong>info</strong> icon in your browser address bar. </li>
+						<li> Look for <strong>Notifications</strong> and change it to <strong>Allow</strong>. </li>
+						<li> <strong>Refresh</strong> this page to apply changes. </li>
+					</ol>
+				</div>
+			{/if}
+
 			<SettingsSwitch
 				label = 'Game Invites'
 				meaning = 'When friends want you to play'
@@ -395,6 +541,56 @@
 		flex-direction: column;
 		justify-content: space-around;
 		align-items: center;
+		gap: 1rem;
+		padding: 1rem;
+	}
+
+	.push-setting {
+		width: 100%;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 0.5rem 0;
+	}
+
+	.push-setting .textContainer {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.push-setting .textContainer span:first-child {
+		font-weight: 500;
+	}
+
+	.push-setting .textContainer span:last-child {
+		font-size: 0.85rem;
+		color: var(--m3c-on-surface-variant);
+	}
+
+	.push-setting .textContainer .error-text {
+		color: var(--m3c-error);
+	}
+
+	.help-box {
+		margin-top: 1rem;
+		padding: 1rem;
+		background: var(--m3c-surface-container-high);
+		border-radius: 0.5rem;
+		font-size: 0.85rem;
+		color: var(--m3c-on-surface);
+	}
+
+	.help-box p {
+		margin-bottom: 0.5rem;
+		font-weight: 500;
+	}
+
+	.help-box ol {
+		padding-left: 1.25rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
 	}
 
 	.statusText {

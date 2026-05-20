@@ -32,6 +32,10 @@ export async function subscribeToPush(): Promise<void> {
 
 	if (!('PushManager' in window)) throw new Error('Push notifications not supported');
 
+	if (Notification.permission === 'denied') {
+		throw new Error('Notifications are blocked by your browser. Please reset permissions in your browser settings.');
+	}
+
 	const permission = await Notification.requestPermission();
 	if (permission !== 'granted') throw new Error('Notification permission not granted');
 
@@ -69,4 +73,39 @@ export async function subscribeToPush(): Promise<void> {
 		const data = await res.json().catch(() => null);
 		throw new Error(data?.error ?? 'Failed to save push subscription');
 	}
+}
+
+/**
+ * Checks if the current browser already has an active push subscription.
+ * 
+ * @returns The subscription object if it exists, otherwise null.
+ */
+export async function getPushSubscription(): Promise<PushSubscription | null> {
+    if (!('serviceWorker' in navigator)) return null;
+    
+    const registration = await navigator.serviceWorker.ready;
+    return await registration.pushManager.getSubscription();
+}
+
+/**
+ * Unsubscribes the current device from push notifications and informs the server.
+ */
+export async function unsubscribeFromPush(): Promise<void> {
+    const subscription = await getPushSubscription();
+    if (!subscription) return;
+
+    // Unsubscribe from browser
+    await subscription.unsubscribe();
+
+    // Inform server
+    const res = await fetch('/api/push_subscription', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ endpoint: subscription.endpoint })
+    });
+
+    if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error ?? 'Failed to remove push subscription');
+    }
 }

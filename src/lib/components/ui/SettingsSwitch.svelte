@@ -4,20 +4,21 @@
     let {
         label,
         meaning,
+        disabled = false,
         active = $bindable()
-    }: { label: string, meaning?: string, active: boolean } = $props();
+    }: { label: string, meaning?: string, disabled?: boolean, active: boolean } = $props();
 </script>
 
 
 <!-- HTML -->
-<div class = 'wrapper'>
+<div class = 'wrapper' class:disabled>
     <div class = 'textContainer'>
         <span>{label}</span>
         {#if meaning} <span>{meaning}</span> {/if}
     </div>
 
     <label>
-        <Switch bind:checked={active} />
+        <Switch bind:checked={active} {disabled} />
     </label>
 </div>
 
@@ -31,6 +32,11 @@
         flex-direction: row;
         justify-content: space-between;
         align-items: center;
+    }
+
+    .wrapper.disabled {
+        opacity: 0.5;
+        pointer-events: none;
     }
 
     .textContainer {
