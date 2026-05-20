@@ -20,11 +20,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
     const { gameId } = await request.json();
 
-    const { error } = await locals.supabase
-        .from('ranked_game_players')
-        .update({ last_seen: new Date().toISOString() })
-        .eq('game_id', gameId)
-        .eq('user_id', user.id);
+    const { error } = await locals.supabase.rpc('heartbeat', { p_game_id: gameId });
 
     if (error) return new Response(null, { status: 500 });
 

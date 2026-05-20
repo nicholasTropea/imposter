@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION check_game_end(p_game_id uuid)
-RETURNS void LANGUAGE plpgsql AS $$
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
     v_turn_order     uuid[];
     v_spy_count      int;

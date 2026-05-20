@@ -1,6 +1,6 @@
 CREATE OR REPLACE FUNCTION public.advance_reveal(p_game_id uuid)
 RETURNS void
-LANGUAGE plpgsql
+LANGUAGE plpgsql SECURITY DEFINER
 AS $$
 DECLARE
     v_game          ranked_games%ROWTYPE;

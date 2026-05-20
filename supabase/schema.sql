@@ -6,7 +6,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 3PP5AMsbn8VZblxKLdTYqp2fOsqrsim76j1lvHIMos7gBUjNgjZLQPYhTyznNGj
+\restrict FEYhGgJ4WpJEQrJGLHOraS1wImyELdbcsavWMYl3ay1ncFXi0FAuGKcywzkt4kp
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg24.04+1)
@@ -64,7 +64,7 @@ CREATE TYPE public.theme_type AS ENUM (
 --
 
 CREATE FUNCTION public.advance_reveal(p_game_id uuid) RETURNS void
-    LANGUAGE plpgsql
+    LANGUAGE plpgsql SECURITY DEFINER
     AS $$
 DECLARE
     v_game          ranked_games%ROWTYPE;
@@ -113,7 +113,7 @@ $$;
 --
 
 CREATE FUNCTION public.advance_to_next_round(p_game_id uuid) RETURNS void
-    LANGUAGE plpgsql
+    LANGUAGE plpgsql SECURITY DEFINER
     AS $$
 DECLARE
     v_game ranked_games%ROWTYPE;
@@ -145,7 +145,7 @@ $$;
 --
 
 CREATE FUNCTION public.advance_turn(p_game_id uuid) RETURNS void
-    LANGUAGE plpgsql
+    LANGUAGE plpgsql SECURITY DEFINER
     AS $$
 DECLARE
     v_game              ranked_games%ROWTYPE;
@@ -221,7 +221,7 @@ $$;
 --
 
 CREATE FUNCTION public.cast_vote(p_game_id uuid, p_voter_id uuid, p_target_id uuid) RETURNS void
-    LANGUAGE plpgsql
+    LANGUAGE plpgsql SECURITY DEFINER
     AS $$
 DECLARE
     v_turn_order     uuid[];                -- active players in the game
@@ -305,7 +305,7 @@ $$;
 --
 
 CREATE FUNCTION public.check_game_end(p_game_id uuid) RETURNS void
-    LANGUAGE plpgsql
+    LANGUAGE plpgsql SECURITY DEFINER
     AS $$
 DECLARE
     v_turn_order     uuid[];
@@ -450,7 +450,7 @@ $$;
 --
 
 CREATE FUNCTION public.guard_word_submission() RETURNS trigger
-    LANGUAGE plpgsql
+    LANGUAGE plpgsql SECURITY DEFINER
     AS $$
 BEGIN
     -- Reject the insert if the submitting player is not the active player
@@ -498,7 +498,7 @@ $$;
 --
 
 CREATE FUNCTION public.handle_player_leave() RETURNS trigger
-    LANGUAGE plpgsql
+    LANGUAGE plpgsql SECURITY DEFINER
     AS $$
 DECLARE
     v_game                      ranked_games%ROWTYPE;
@@ -630,7 +630,7 @@ $$;
 --
 
 CREATE FUNCTION public.handle_word_submitted() RETURNS trigger
-    LANGUAGE plpgsql
+    LANGUAGE plpgsql SECURITY DEFINER
     AS $$
 BEGIN
     -- Only advance the turn if the submitting player is the active one.
@@ -650,11 +650,27 @@ $$;
 
 
 --
+-- Name: heartbeat(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.heartbeat(p_game_id uuid) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    AS $$
+BEGIN
+    UPDATE public.ranked_game_players
+    SET last_seen = now()
+    WHERE game_id = p_game_id
+    AND user_id = auth.uid();
+END;
+$$;
+
+
+--
 -- Name: join_or_create_ranked_game(uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
 CREATE FUNCTION public.join_or_create_ranked_game(p_user_id uuid) RETURNS uuid
-    LANGUAGE plpgsql
+    LANGUAGE plpgsql SECURITY DEFINER
     AS $$
 
 -- DECLARE is where you define local variables
@@ -790,7 +806,7 @@ $$;
 --
 
 CREATE FUNCTION public.tally_votes(p_game_id uuid) RETURNS void
-    LANGUAGE plpgsql
+    LANGUAGE plpgsql SECURITY DEFINER
     AS $$
 DECLARE
     v_round             int;
@@ -1188,7 +1204,7 @@ CREATE TRIGGER on_word_submitted AFTER INSERT ON public.game_rounds FOR EACH ROW
 -- Name: notification_outbox send_push_notification; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER send_push_notification AFTER INSERT ON public.notification_outbox FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('https://rsimwvkiyhpfpjpqhche.supabase.co/functions/v1/send-push', 'POST', '{"Content-type":"application/json","apikey":"sb_secret_SECRET_KEY"}', '{}', '5000');
+CREATE TRIGGER send_push_notification AFTER INSERT ON public.notification_outbox FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('https://rsimwvkiyhpfpjpqhche.supabase.co/functions/v1/send-push', 'POST', '{"Content-type":"application/json","Authorization":"Bearer SECRET_KEY"}', '{}', '5000');
 
 
 --
@@ -1280,8 +1296,119 @@ ALTER TABLE ONLY public.settings
 
 
 --
+-- Name: words Authenticated users can read the word bank; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Authenticated users can read the word bank" ON public.words FOR SELECT TO authenticated USING (true);
+
+
+--
+-- Name: game_rounds Game rounds are viewable by participants; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Game rounds are viewable by participants" ON public.game_rounds FOR SELECT USING (true);
+
+
+--
+-- Name: ranked_games Games are viewable by everyone; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Games are viewable by everyone" ON public.ranked_games FOR SELECT USING (true);
+
+
+--
+-- Name: ranked_game_players Lobby membership is viewable by everyone; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Lobby membership is viewable by everyone" ON public.ranked_game_players FOR SELECT USING (true);
+
+
+--
+-- Name: game_rounds Players can insert their own round data; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Players can insert their own round data" ON public.game_rounds FOR INSERT TO authenticated WITH CHECK ((auth.uid() = player_id));
+
+
+--
+-- Name: players Public profiles are viewable by everyone; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Public profiles are viewable by everyone" ON public.players FOR SELECT USING (true);
+
+
+--
+-- Name: push_subscriptions Users can manage their own push subscriptions; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can manage their own push subscriptions" ON public.push_subscriptions TO authenticated USING ((auth.uid() = player_id));
+
+
+--
+-- Name: settings Users can manage their own settings; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can manage their own settings" ON public.settings TO authenticated USING ((auth.uid() = user_id));
+
+
+--
+-- Name: players Users can update their own profile; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can update their own profile" ON public.players FOR UPDATE TO authenticated USING ((auth.uid() = id));
+
+
+--
+-- Name: game_rounds; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.game_rounds ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: notification_outbox; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.notification_outbox ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: players; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.players ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: push_subscriptions; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: ranked_game_players; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.ranked_game_players ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: ranked_games; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.ranked_games ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: settings; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: words; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.words ENABLE ROW LEVEL SECURITY;
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 3PP5AMsbn8VZblxKLdTYqp2fOsqrsim76j1lvHIMos7gBUjNgjZLQPYhTyznNGj
+\unrestrict FEYhGgJ4WpJEQrJGLHOraS1wImyELdbcsavWMYl3ay1ncFXi0FAuGKcywzkt4kp
 

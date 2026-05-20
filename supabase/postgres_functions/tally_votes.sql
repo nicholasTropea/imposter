@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION tally_votes(p_game_id uuid)
-RETURNS void LANGUAGE plpgsql AS $$
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
     v_round             int;
     v_skips             int;

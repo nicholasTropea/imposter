@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION advance_to_next_round(p_game_id uuid)
-RETURNS void LANGUAGE plpgsql AS $$
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
     v_game ranked_games%ROWTYPE;
 BEGIN

@@ -24,6 +24,29 @@ The application uses the following stack:
 
 SvelteKit handles routing, layouts, server `load` functions, form actions, and client-side navigation. Supabase provides authentication, PostgreSQL storage, Row Level Security, Realtime subscriptions, and RPC-backed game logic.
 
+## Security
+
+The application follows a **Locked-Door** security strategy using PostgreSQL Row Level Security (RLS) and authorized "Gatekeeper" functions.
+
+### Row Level Security (RLS)
+
+RLS is enabled on all database tables. Access is denied by default and explicitly granted through policies:
+
+- **Personal Data:** Tables like `settings` and `push_subscriptions` use policies that restrict access solely to the owner (`auth.uid() = user_id`).
+- **Public Profiles:** The `players` table allows everyone to `SELECT` profiles (for leaderboards and lobby) but only allows users to `UPDATE` their own row.
+- **Game State:** `ranked_games` and `ranked_game_players` are viewable by all to support real-time UI synchronization, but direct client-side `INSERT`, `UPDATE`, or `DELETE` is prohibited.
+- **Round Data:** Players can `INSERT` rows into `game_rounds` for themselves, but they cannot update or delete submissions.
+
+### Security Definer Gatekeepers
+
+To maintain a secure state machine while blocking direct client writes, core game logic is encapsulated in PostgreSQL functions defined with `SECURITY DEFINER`. These functions act as authorized gatekeepers:
+
+- **Matchmaking:** `join_or_create_ranked_game` handles atomic player insertion and game initialization.
+- **Game Logic:** All phase transitions (`advance_turn`, `advance_reveal`, `advance_to_next_round`), voting (`cast_vote`, `tally_votes`), and game-end checks (`check_game_end`) run with elevated privileges. This ensures that game rules are enforced server-side and cannot be bypassed by client-side console manipulation.
+- **Heartbeat:** A dedicated `heartbeat()` RPC allows players to update their `last_seen` timestamp without having general `UPDATE` permissions on the `ranked_game_players` table.
+
+This architecture ensures that the database remains the single source of truth, race conditions are avoided through atomic transactions, and the application is resilient against unauthorized data modification.
+
 The frontend also includes a shared connectivity layer composed of `lib/stores/network.ts`, `lib/utils/checkConnection.ts`, and `lib/utils/onlineGuard.ts`. These files provide global offline state, real network verification, and reusable guards for online-only navigation and form submissions.
 
 ## Authentication

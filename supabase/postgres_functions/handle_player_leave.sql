@@ -5,7 +5,7 @@
 -- If the game is in progress, updates the turn_order, turn_index and
 -- active_player_id columns based on the index of the deleted player.
 CREATE OR REPLACE FUNCTION handle_player_leave()
-RETURNS trigger LANGUAGE plpgsql
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
 AS $$
 DECLARE
     v_game                      ranked_games%ROWTYPE;

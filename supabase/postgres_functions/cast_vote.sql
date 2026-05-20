@@ -3,7 +3,7 @@ CREATE OR REPLACE FUNCTION public.cast_vote(
     p_voter_id   uuid, -- the player casting the vote
     p_target_id  uuid  -- the player being voted against (NULL = skip)
 ) RETURNS void
-LANGUAGE plpgsql
+LANGUAGE plpgsql SECURITY DEFINER
 AS $$
 DECLARE
     v_turn_order     uuid[];                -- active players in the game

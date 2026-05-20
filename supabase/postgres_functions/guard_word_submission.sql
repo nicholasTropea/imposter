@@ -1,6 +1,6 @@
 CREATE OR REPLACE FUNCTION public.guard_word_submission()
 RETURNS trigger
-LANGUAGE plpgsql
+LANGUAGE plpgsql SECURITY DEFINER
 AS $$
 BEGIN
     -- Reject the insert if the submitting player is not the active player

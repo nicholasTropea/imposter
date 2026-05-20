@@ -344,6 +344,7 @@ export type Database = {
       close_voting: { Args: { p_game_id: string }; Returns: undefined }
       game_tick: { Args: never; Returns: undefined }
       get_player_rank: { Args: { p_user_id: string }; Returns: number }
+      heartbeat: { Args: { p_game_id: string }; Returns: undefined }
       join_or_create_ranked_game: {
         Args: { p_user_id: string }
         Returns: string

@@ -5,7 +5,7 @@
 
 CREATE OR REPLACE FUNCTION public.handle_word_submitted()
 RETURNS trigger
-LANGUAGE plpgsql
+LANGUAGE plpgsql SECURITY DEFINER
 AS $$
 BEGIN
     -- Only advance the turn if the submitting player is the active one.

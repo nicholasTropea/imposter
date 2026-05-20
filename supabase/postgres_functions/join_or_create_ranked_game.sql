@@ -13,7 +13,9 @@
 --   - The game phase is set to 'word_input'
 --
 -- Returns the UUID of the game the player joined or created.
-create or replace function join_or_create_ranked_game (p_user_id UUID) RETURNS UUID as $$
+create or replace function join_or_create_ranked_game (p_user_id UUID) RETURNS UUID
+LANGUAGE plpgsql SECURITY DEFINER
+as $$
 
 -- DECLARE is where you define local variables
 DECLARE
