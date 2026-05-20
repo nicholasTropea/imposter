@@ -45,9 +45,15 @@ export const handle: Handle = async ({ event, resolve }) => {
             cookies: {
                 getAll: () => event.cookies.getAll(),
                 setAll: (cookiesToSet) => {
-                    cookiesToSet.forEach(({ name, value, options }) =>
-                        event.cookies.set(name, value, { ...options, path: '/' })
-                    )
+                    cookiesToSet.forEach(({ name, value, options }) => {
+                        try {
+                            event.cookies.set(name, value, { ...options, path: '/' })
+                        } catch {
+                            // SvelteKit will throw an error if you try to set a cookie after the response has been generated.
+                            // This can happen if you use a Supabase client in a way that triggers a session refresh
+                            // after the headers have already been sent.
+                        }
+                    })
                 }
             }
         }
@@ -77,6 +83,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 
         return { session, user };
     };
+
+    await event.locals.safeGetSession();
 
     return resolve(event, {
         filterSerializedResponseHeaders: (name) =>

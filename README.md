@@ -32,7 +32,9 @@ Users register an account and confirm their email address if email confirmation 
 
 Authentication is split between client-side state and server-protected route groups. Client-side auth state is initialized through `lib/stores/auth.ts` for reactive UI and navigation decisions, while authenticated server-backed sections remain guarded through the `(protected)` route group rather than through global layout-level server loading.
 
-This means `/home` is no longer treated as a fully protected server route. Instead, it remains available offline as part of the application shell, while operations that require a live Supabase session are guarded individually through online-gated navigation, form handlers, and protected server routes where appropriate.
+The server hook in `src/hooks.server.ts` manages the request-scoped Supabase client. It explicitly validates the session via `safeGetSession()` before resolving the request, ensuring that any necessary session refreshes and cookie updates occur before the response headers are sent. This prevents "Cannot use cookies.set(...) after the response has been generated" errors that can occur with asynchronous Supabase refreshes.
+
+This means `/home` is no longer treated as a fully protected server route. instead, it remains available offline as part of the application shell, while operations that require a live Supabase session are guarded individually through online-gated navigation, form handlers, and protected server routes where appropriate.
 
 ## Settings
 
